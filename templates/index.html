@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>MultiTracking</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<nav class="navbar">
+    <div class="nav-inner">
+        <a href="{{ url_for('index') }}" class="brand">
+            <span class="brand-mark">MT</span>
+            <span>MultiTracking</span>
+        </a>
+
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">Trang chủ</a>
+            <a href="{{ url_for('upload_video') }}">Video upload</a>
+            <a href="{{ url_for('webcam') }}">Webcam</a>
+        </div>
+    </div>
+</nav>
+
+<main class="container">
+    <section class="hero">
+        <div class="hero-content">
+            <span class="badge">YOLOv5n + DeepSORT · CPU Local Web</span>
+            <h1>Theo vết đa đối tượng trên web local</h1>
+            <p>
+                MultiTracking hỗ trợ phát hiện người, gán ID theo thời gian,
+                xử lý video upload và tracking trực tiếp từ webcam.
+            </p>
+
+            <div class="hero-actions">
+                <a class="button" href="{{ url_for('upload_video') }}">
+                    Tracking từ video
+                </a>
+                <a class="button secondary" href="{{ url_for('webcam') }}">
+                    Tracking từ webcam
+                </a>
+            </div>
+        </div>
+
+        <div class="hero-panel">
+            <div class="panel-row">
+                <span>Detector</span>
+                <strong>YOLOv5n</strong>
+            </div>
+            <div class="panel-row">
+                <span>Tracker</span>
+                <strong>DeepSORT</strong>
+            </div>
+            <div class="panel-row">
+                <span>Runtime</span>
+                <strong>CPU</strong>
+            </div>
+            <div class="panel-row">
+                <span>Output</span>
+                <strong>Video + TXT + Metrics</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="grid-2">
+        <article class="card feature-card">
+            <div class="icon-box">01</div>
+            <h2>Video upload</h2>
+            <p>
+                Upload video, hệ thống sẽ phát hiện người, gán ID,
+                xuất video kết quả và file tracking theo từng frame.
+            </p>
+            <a class="link" href="{{ url_for('upload_video') }}">Mở chức năng upload</a>
+        </article>
+
+        <article class="card feature-card">
+            <div class="icon-box">02</div>
+            <h2>Webcam realtime</h2>
+            <p>
+                Chạy tracking trực tiếp từ webcam trên trình duyệt,
+                phù hợp để demo luồng xử lý realtime.
+            </p>
+            <a class="link" href="{{ url_for('webcam') }}">Mở webcam</a>
+        </article>
+    </section>
+
+    <section class="card">
+        <div class="section-title">
+            <h2>Pipeline xử lý</h2>
+            <p>Luồng xử lý chính của hệ thống.</p>
+        </div>
+
+        <div class="pipeline">
+            <div class="pipeline-step">
+                <span>1</span>
+                <strong>Input</strong>
+                <p>Video hoặc webcam</p>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+                <span>2</span>
+                <strong>YOLOv5n</strong>
+                <p>Detect person</p>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+                <span>3</span>
+                <strong>DeepSORT</strong>
+                <p>Gán ID</p>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+                <span>4</span>
+                <strong>Output</strong>
+                <p>Video, TXT, metrics</p>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>

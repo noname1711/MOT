@@ -1,0 +1,15 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.11.0+cpu
+torchvision
+ultralytics
+opencv-python
+flask
+deep-sort-realtime
+numpy
+pillow
+pandas
+tqdm
+matplotlib
+scipy
+scikit-learn

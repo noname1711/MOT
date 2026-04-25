@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Data and outputs
+uploads/*
+static/outputs/*
+results/videos/*
+results/txt/*
+results/metrics/*
+
+# Logs
+*.log

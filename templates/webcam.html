@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Webcam Tracking - MultiTracking</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<nav class="navbar">
+    <div class="nav-inner">
+        <a href="{{ url_for('index') }}" class="brand">
+            <span class="brand-mark">MT</span>
+            <span>MultiTracking</span>
+        </a>
+
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">Trang chủ</a>
+            <a href="{{ url_for('upload_video') }}">Video upload</a>
+            <a href="{{ url_for('webcam') }}" class="active">Webcam</a>
+        </div>
+    </div>
+</nav>
+
+<main class="container">
+    <section class="page-header">
+        <span class="badge">Realtime mode</span>
+        <h1>Tracking từ webcam</h1>
+        <p>
+            YOLOv5n phát hiện người và DeepSORT gán ID trực tiếp từ webcam.
+            Có thể ghi lại video đã overlay bounding box, ID và confidence.
+        </p>
+    </section>
+
+    <section class="card">
+        <div class="section-title">
+            <h2>Webcam stream</h2>
+            <p>Đóng tab hoặc quay lại trang chủ để dừng webcam.</p>
+        </div>
+
+        <div class="webcam-box">
+            <img
+                src="{{ url_for('webcam_feed') }}"
+                alt="Webcam Tracking Stream"
+                id="webcam-stream"
+            >
+        </div>
+
+        <div class="record-panel">
+            <div>
+                <strong>Webcam recording</strong>
+                <p id="record-status">Trạng thái: chưa ghi hình.</p>
+            </div>
+
+            <div class="actions">
+                <button
+                    type="button"
+                    class="button"
+                    id="start-record-btn"
+                    data-start-url="{{ url_for('webcam_start_record') }}"
+                >
+                    Bắt đầu ghi
+                </button>
+
+                <button
+                    type="button"
+                    class="button secondary"
+                    id="stop-record-btn"
+                    data-stop-url="{{ url_for('webcam_stop_record') }}"
+                    disabled
+                >
+                    Dừng ghi
+                </button>
+            </div>
+        </div>
+
+        <div class="record-result is-hidden" id="record-result">
+            <h3>Video webcam vừa ghi</h3>
+
+            <video controls id="recorded-video">
+                Trình duyệt của bạn không hỗ trợ video.
+            </video>
+
+            <div class="actions mt-16">
+                <a href="#" class="button" id="download-record-link">
+                    Tải video webcam
+                </a>
+
+                <a href="#" class="button light" id="open-record-link" target="_blank">
+                    Mở trong tab mới
+                </a>
+            </div>
+        </div>
+
+        <div class="webcam-note">
+            <div>
+                <strong>Model:</strong>
+                <span>YOLOv5n + DeepSORT</span>
+            </div>
+            <div>
+                <strong>Device:</strong>
+                <span>CPU</span>
+            </div>
+            <div>
+                <strong>Mode:</strong>
+                <span>Realtime webcam</span>
+            </div>
+        </div>
+    </section>
+
+    <p class="back-row">
+        <a href="{{ url_for('index') }}" class="link">Quay lại trang chủ</a>
+    </p>
+</main>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
