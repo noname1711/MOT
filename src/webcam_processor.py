@@ -1,6 +1,6 @@
 import os
 import shutil
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 import cv2
 
@@ -11,13 +11,13 @@ from src.utils import convert_video_to_h264
 
 class WebcamProcessor:
     """
-    WebcamProcessor xử lý luồng webcam realtime.
+    WebcamProcessor xử lý luồng webcam realtime cho vehicle tracking.
 
     Chức năng:
         - Stream webcam lên web
-        - YOLODetector phát hiện người
-        - DeepSORTTracker gán ID
-        - Có thể ghi lại video đã overlay bounding box + ID
+        - YOLODetector phát hiện phương tiện
+        - DeepSORTTracker gán vehicle ID
+        - Có thể ghi lại video đã overlay bounding box + ID + class + confidence
     """
 
     def __init__(
@@ -88,7 +88,7 @@ class WebcamProcessor:
         fps: float = 20.0
     ) -> Dict[str, Any]:
         """
-        Bắt đầu ghi video webcam đã overlay.
+        Bắt đầu ghi video webcam vehicle tracking đã overlay.
 
         Video được ghi tạm bằng mp4v, sau đó khi stop sẽ convert sang H.264.
         """
@@ -118,7 +118,7 @@ class WebcamProcessor:
 
         return {
             "success": True,
-            "message": "Đã bắt đầu ghi hình webcam.",
+            "message": "Đã bắt đầu ghi hình webcam vehicle tracking.",
             "static_output_path": static_output_path,
             "result_output_path": result_output_path
         }
@@ -170,7 +170,7 @@ class WebcamProcessor:
 
         result = {
             "success": True,
-            "message": "Đã dừng ghi hình webcam.",
+            "message": "Đã dừng ghi hình webcam vehicle tracking.",
             "frame_count": self.record_frame_count,
             "fps": self.record_fps,
             "static_output_path": self.record_static_path,
@@ -233,7 +233,7 @@ class WebcamProcessor:
                 tracks = self.tracker.update(detections, frame)
                 output_frame = self.tracker.draw_tracks(frame, tracks)
 
-                # Ghi lại đúng frame đã overlay
+                # Ghi lại đúng frame vehicle tracking đã overlay
                 self._write_recording_frame(output_frame)
 
                 success, buffer = cv2.imencode(".jpg", output_frame)

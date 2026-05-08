@@ -29,6 +29,14 @@ RESULT_METRICS_FOLDER = "results/metrics"
 
 ALLOWED_EXTENSIONS = {"mp4", "avi", "mov", "mkv"}
 
+VEHICLE_MODEL_NAME = "YOLOv5n + DeepSORT Vehicle Tracking"
+VEHICLE_TARGET_CLASSES = {
+    2: "car",
+    3: "motorcycle",
+    5: "bus",
+    7: "truck"
+}
+
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["STATIC_OUTPUT_FOLDER"] = STATIC_OUTPUT_FOLDER
 app.config["RESULT_VIDEO_FOLDER"] = RESULT_VIDEO_FOLDER
@@ -46,7 +54,7 @@ latest_webcam_recording = {
 
 def get_webcam_processor() -> WebcamProcessor:
     """
-    Tạo hoặc lấy WebcamProcessor dùng chung.
+    Tạo hoặc lấy WebcamProcessor dùng chung cho vehicle tracking.
     """
 
     global webcam_processor
@@ -74,7 +82,7 @@ def allowed_file(filename: str) -> bool:
 @app.route("/")
 def index():
     """
-    Trang chủ.
+    Trang chủ Vehicle Tracking.
     """
 
     return render_template("index.html")
@@ -83,7 +91,7 @@ def index():
 @app.route("/upload", methods=["GET", "POST"])
 def upload_video():
     """
-    Trang upload video và chạy multi-object tracking.
+    Trang upload traffic video và chạy vehicle tracking.
     """
 
     result = None
@@ -110,8 +118,8 @@ def upload_video():
         input_filename = f"{timestamp}_{original_filename}"
         input_path = os.path.join(app.config["UPLOAD_FOLDER"], input_filename)
 
-        output_video_name = f"{timestamp}_tracking.mp4"
-        output_txt_name = f"{timestamp}_tracking.txt"
+        output_video_name = f"{timestamp}_vehicle_tracking.mp4"
+        output_txt_name = f"{timestamp}_vehicle_tracking.txt"
 
         static_output_video_path = os.path.join(
             app.config["STATIC_OUTPUT_FOLDER"],
@@ -159,6 +167,7 @@ def upload_video():
             )
 
             metrics_data = {
+                "task": "vehicle_tracking",
                 "input_video_path": input_path,
                 "output_video_path": result_video_path,
                 "web_output_video_path": static_output_video_path,
@@ -170,11 +179,13 @@ def upload_video():
                 "original_fps": round(info["original_fps"], 2),
                 "width": info["width"],
                 "height": info["height"],
-                "model": "YOLOv5n + DeepSORT",
+                "model": VEHICLE_MODEL_NAME,
                 "yolo_model_path": "models/yolov5n.pt",
+                "tracker": "DeepSORT",
                 "device": "CPU",
                 "confidence_threshold": 0.35,
                 "image_size": 416,
+                "target_classes": VEHICLE_TARGET_CLASSES,
                 "created_at": timestamp,
                 "total_tracks": tracking_statistics["total_tracks"],
                 "total_tracking_rows": tracking_statistics["total_tracking_rows"]
@@ -211,7 +222,7 @@ def upload_video():
 @app.route("/webcam")
 def webcam():
     """
-    Trang hiển thị webcam realtime.
+    Trang hiển thị vehicle tracking realtime từ webcam.
     """
 
     return render_template("webcam.html")
@@ -234,13 +245,13 @@ def webcam_feed():
 @app.route("/webcam/start_record", methods=["POST"])
 def webcam_start_record():
     """
-    Bắt đầu ghi webcam overlay.
+    Bắt đầu ghi webcam overlay cho vehicle tracking.
     """
 
     global latest_webcam_recording
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_name = f"{timestamp}_webcam_recording.mp4"
+    output_name = f"{timestamp}_webcam_vehicle_tracking.mp4"
 
     static_output_path = os.path.join(STATIC_OUTPUT_FOLDER, output_name)
     result_output_path = os.path.join(RESULT_VIDEO_FOLDER, output_name)
@@ -304,7 +315,7 @@ def webcam_stop_record():
 @app.route("/download/txt/<filename>")
 def download_txt(filename):
     """
-    Tải file tracking txt.
+    Tải file vehicle tracking txt.
     """
 
     return send_from_directory(
@@ -317,7 +328,7 @@ def download_txt(filename):
 @app.route("/download/video/<filename>")
 def download_video(filename):
     """
-    Tải video tracking kết quả.
+    Tải video vehicle tracking kết quả.
     """
 
     return send_from_directory(

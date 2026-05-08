@@ -12,15 +12,25 @@ from src.utils import convert_video_to_h264
 
 class VideoProcessor:
     """
-    VideoProcessor xử lý video upload.
+    VideoProcessor xử lý traffic video upload cho bài toán vehicle tracking.
 
     Pipeline:
-        Input video
-        → YOLODetector phát hiện người
-        → DeepSORTTracker gán ID
-        → Lưu output video
+        Input traffic video
+        → YOLODetector phát hiện phương tiện
+        → DeepSORTTracker gán vehicle ID
+        → Lưu output video đã overlay bounding box + ID + class + confidence
         → Convert output video sang H.264 để web phát được
-        → Lưu tracking_result.txt
+        → Lưu vehicle tracking result txt
+
+    File tracking txt có format:
+        frame,id,x,y,w,h,conf,class,visibility
+
+    Trong đó:
+        class = 2  -> car
+        class = 3  -> motorcycle
+        class = 5  -> bus
+        class = 7  -> truck
+        class = -1 -> predicted, track được DeepSORT dự đoán tạm thời
     """
 
     def __init__(
@@ -50,17 +60,17 @@ class VideoProcessor:
         output_txt_path: str
     ) -> Dict[str, Any]:
         """
-        Xử lý một video.
+        Xử lý một traffic video.
 
         Args:
             input_video_path:
                 Đường dẫn video input.
 
             output_video_path:
-                Đường dẫn video output sau khi vẽ bounding box + ID.
+                Đường dẫn video output sau khi vẽ bounding box + vehicle ID.
 
             output_txt_path:
-                Đường dẫn file txt lưu kết quả tracking.
+                Đường dẫn file txt lưu kết quả vehicle tracking.
 
         Returns:
             Dict chứa thông tin xử lý:
@@ -70,6 +80,9 @@ class VideoProcessor:
                 input_video_path
                 output_video_path
                 output_txt_path
+                width
+                height
+                original_fps
         """
 
         if not os.path.exists(input_video_path):
@@ -115,8 +128,8 @@ class VideoProcessor:
             with open(output_txt_path, mode="w", newline="") as txt_file:
                 csv_writer = csv.writer(txt_file)
 
-                # Header giúp người đọc hiểu file.
-                # Nếu sau này dùng tool MOTChallenge chuẩn, có thể bỏ header này.
+                # Header nội bộ để web/statistics đọc dễ hơn.
+                # Nếu cần nộp theo MOTChallenge chuẩn, có thể export thêm bản không header.
                 csv_writer.writerow([
                     "frame",
                     "id",

@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Webcam Tracking - MultiTracking</title>
+    <title>Realtime Vehicle Tracking - Vehicle Tracking</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -10,13 +10,13 @@
 <nav class="navbar">
     <div class="nav-inner">
         <a href="{{ url_for('index') }}" class="brand">
-            <span class="brand-mark">MT</span>
-            <span>MultiTracking</span>
+            <span class="brand-mark">VT</span>
+            <span>Vehicle Tracking</span>
         </a>
 
         <div class="nav-links">
             <a href="{{ url_for('index') }}">Trang chủ</a>
-            <a href="{{ url_for('upload_video') }}">Video upload</a>
+            <a href="{{ url_for('upload_video') }}">Traffic video</a>
             <a href="{{ url_for('webcam') }}" class="active">Webcam</a>
         </div>
     </div>
@@ -24,11 +24,11 @@
 
 <main class="container">
     <section class="page-header">
-        <span class="badge">Realtime mode</span>
-        <h1>Tracking từ webcam</h1>
+        <span class="badge">Realtime vehicle mode</span>
+        <h1>Vehicle tracking từ webcam</h1>
         <p>
-            YOLOv5n phát hiện người và DeepSORT gán ID trực tiếp từ webcam.
-            Có thể ghi lại video đã overlay bounding box, ID và confidence.
+            YOLOv5n phát hiện phương tiện và DeepSORT gán ID trực tiếp từ webcam.
+            Có thể ghi lại video đã overlay bounding box, vehicle ID, class và confidence.
         </p>
     </section>
 
@@ -41,14 +41,14 @@
         <div class="webcam-box">
             <img
                 src="{{ url_for('webcam_feed') }}"
-                alt="Webcam Tracking Stream"
+                alt="Realtime Vehicle Tracking Stream"
                 id="webcam-stream"
             >
         </div>
 
         <div class="record-panel">
             <div>
-                <strong>Webcam recording</strong>
+                <strong>Webcam vehicle recording</strong>
                 <p id="record-status">Trạng thái: chưa ghi hình.</p>
             </div>
 
@@ -75,7 +75,7 @@
         </div>
 
         <div class="record-result is-hidden" id="record-result">
-            <h3>Video webcam vừa ghi</h3>
+            <h3>Video webcam vehicle tracking vừa ghi</h3>
 
             <video controls id="recorded-video">
                 Trình duyệt của bạn không hỗ trợ video.
@@ -98,12 +98,12 @@
                 <span>YOLOv5n + DeepSORT</span>
             </div>
             <div>
-                <strong>Device:</strong>
-                <span>CPU</span>
+                <strong>Target:</strong>
+                <span>Car, motorcycle, bus, truck</span>
             </div>
             <div>
-                <strong>Mode:</strong>
-                <span>Realtime webcam</span>
+                <strong>Device:</strong>
+                <span>CPU</span>
             </div>
         </div>
     </section>

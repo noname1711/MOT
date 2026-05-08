@@ -6,6 +6,15 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 
+VEHICLE_CLASS_NAMES = {
+    2: "car",
+    3: "motorcycle",
+    5: "bus",
+    7: "truck",
+    -1: "predicted"
+}
+
+
 def save_metrics(metrics: Dict[str, Any], output_dir: str = "results/metrics") -> str:
     """
     Lưu thông tin metrics sau khi xử lý video ra file JSON.
@@ -72,18 +81,59 @@ def convert_video_to_h264(input_path: str, output_path: str) -> None:
     )
 
 
+def get_vehicle_class_name(class_id: int) -> str:
+    """
+    Lấy tên class vehicle từ class_id.
+    """
+
+    return VEHICLE_CLASS_NAMES.get(class_id, f"class_{class_id}")
+
+
+def get_main_class_id(records: List[Dict[str, Any]]) -> int:
+    """
+    Lấy class_id chính của một track.
+
+    Vì DeepSORT có thể duy trì track ở các frame không match được YOLO,
+    những frame đó có class_id = -1. Khi thống kê, ta bỏ qua -1 và chọn
+    class_id thật xuất hiện nhiều nhất trong track.
+    """
+
+    class_counts: Dict[int, int] = {}
+
+    for item in records:
+        class_id = int(item["class_id"])
+
+        if class_id == -1:
+            continue
+
+        class_counts[class_id] = class_counts.get(class_id, 0) + 1
+
+    if not class_counts:
+        return -1
+
+    return max(class_counts, key=class_counts.get)
+
+
 def analyze_tracking_txt(
     tracking_txt_path: str,
     fps: float = 25.0
 ) -> Dict[str, Any]:
     """
-    Phân tích file tracking txt để thống kê các đối tượng đã tracking được.
+    Phân tích file tracking txt để thống kê các phương tiện đã tracking được.
 
     File input có dạng:
         frame,id,x,y,w,h,conf,class,visibility
 
+    Với vehicle tracking:
+        class = 2  -> car
+        class = 3  -> motorcycle
+        class = 5  -> bus
+        class = 7  -> truck
+        class = -1 -> predicted, track được DeepSORT dự đoán nhưng không match YOLO
+
     Trả về:
         {
+            "target": "vehicle",
             "total_tracks": ...,
             "total_tracking_rows": ...,
             "tracks": [...]
@@ -155,14 +205,23 @@ def analyze_tracking_txt(
         confs = [item["conf"] for item in records]
         visibilities = [item["visibility"] for item in records]
 
+        detection_records = [
+            item for item in records
+            if int(item["visibility"]) == 1 and int(item["class_id"]) != -1
+        ]
+
+        predicted_records = [
+            item for item in records
+            if int(item["visibility"]) == 0 or int(item["class_id"]) == -1
+        ]
+
         first_frame = min(frames)
         last_frame = max(frames)
         frames_tracked = len(records)
+        detection_frames = len(detection_records)
+        predicted_frames = len(predicted_records)
 
-        # Số giây thực sự được tracker ghi nhận.
         tracked_duration_seconds = frames_tracked / fps
-
-        # Khoảng thời gian từ frame đầu đến frame cuối.
         lifespan_seconds = (last_frame - first_frame + 1) / fps
 
         avg_x = sum(xs) / len(xs)
@@ -172,21 +231,30 @@ def analyze_tracking_txt(
         avg_conf = sum(confs) / len(confs)
         avg_visibility = sum(visibilities) / len(visibilities)
 
-        class_id = records[0]["class_id"]
-        class_name = "person" if class_id == 0 else str(class_id)
+        if detection_records:
+            detection_confs = [item["conf"] for item in detection_records]
+            avg_detection_confidence = sum(detection_confs) / len(detection_confs)
+        else:
+            avg_detection_confidence = 0.0
+
+        main_class_id = get_main_class_id(records)
+        class_name = get_vehicle_class_name(main_class_id)
 
         total_tracking_rows += frames_tracked
 
         track_statistics.append({
             "track_id": track_id,
-            "class_id": class_id,
+            "class_id": main_class_id,
             "class_name": class_name,
             "first_frame": first_frame,
             "last_frame": last_frame,
             "frames_tracked": frames_tracked,
+            "detection_frames": detection_frames,
+            "predicted_frames": predicted_frames,
             "tracked_duration_seconds": round(tracked_duration_seconds, 2),
             "lifespan_seconds": round(lifespan_seconds, 2),
             "avg_confidence": round(avg_conf, 4),
+            "avg_detection_confidence": round(avg_detection_confidence, 4),
             "avg_visibility": round(avg_visibility, 4),
             "avg_bbox": {
                 "x": round(avg_x, 2),
@@ -196,7 +264,6 @@ def analyze_tracking_txt(
             }
         })
 
-    # Sắp xếp ID theo số frame xuất hiện nhiều nhất
     track_statistics = sorted(
         track_statistics,
         key=lambda item: item["frames_tracked"],
@@ -204,9 +271,11 @@ def analyze_tracking_txt(
     )
 
     return {
+        "target": "vehicle",
         "tracking_txt_path": tracking_txt_path,
         "fps": fps,
         "total_tracks": len(track_statistics),
         "total_tracking_rows": total_tracking_rows,
+        "vehicle_class_names": VEHICLE_CLASS_NAMES,
         "tracks": track_statistics
     }

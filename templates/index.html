@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>MultiTracking</title>
+    <title>Vehicle Tracking System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -10,13 +10,13 @@
 <nav class="navbar">
     <div class="nav-inner">
         <a href="{{ url_for('index') }}" class="brand">
-            <span class="brand-mark">MT</span>
-            <span>MultiTracking</span>
+            <span class="brand-mark">VT</span>
+            <span>Vehicle Tracking</span>
         </a>
 
         <div class="nav-links">
-            <a href="{{ url_for('index') }}">Trang chủ</a>
-            <a href="{{ url_for('upload_video') }}">Video upload</a>
+            <a href="{{ url_for('index') }}" class="active">Trang chủ</a>
+            <a href="{{ url_for('upload_video') }}">Traffic video</a>
             <a href="{{ url_for('webcam') }}">Webcam</a>
         </div>
     </div>
@@ -25,16 +25,16 @@
 <main class="container">
     <section class="hero">
         <div class="hero-content">
-            <span class="badge">YOLOv5n + DeepSORT · CPU Local Web</span>
-            <h1>Theo vết đa đối tượng trên web local</h1>
+            <span class="badge">YOLOv5n + DeepSORT · Vehicle Tracking · CPU Local Web</span>
+            <h1>Theo vết phương tiện giao thông trên web local</h1>
             <p>
-                MultiTracking hỗ trợ phát hiện người, gán ID theo thời gian,
-                xử lý video upload và tracking trực tiếp từ webcam.
+                Hệ thống hỗ trợ phát hiện và theo vết phương tiện giao thông,
+                gán ID theo thời gian, xử lý traffic video upload và tracking trực tiếp từ webcam.
             </p>
 
             <div class="hero-actions">
                 <a class="button" href="{{ url_for('upload_video') }}">
-                    Tracking từ video
+                    Tracking từ traffic video
                 </a>
                 <a class="button secondary" href="{{ url_for('webcam') }}">
                     Tracking từ webcam
@@ -52,8 +52,8 @@
                 <strong>DeepSORT</strong>
             </div>
             <div class="panel-row">
-                <span>Runtime</span>
-                <strong>CPU</strong>
+                <span>Target</span>
+                <strong>Car, Motorcycle, Bus, Truck</strong>
             </div>
             <div class="panel-row">
                 <span>Output</span>
@@ -65,20 +65,20 @@
     <section class="grid-2">
         <article class="card feature-card">
             <div class="icon-box">01</div>
-            <h2>Video upload</h2>
+            <h2>Traffic video upload</h2>
             <p>
-                Upload video, hệ thống sẽ phát hiện người, gán ID,
-                xuất video kết quả và file tracking theo từng frame.
+                Upload video giao thông, hệ thống sẽ phát hiện phương tiện,
+                gán ID, xuất video kết quả và file tracking theo từng frame.
             </p>
             <a class="link" href="{{ url_for('upload_video') }}">Mở chức năng upload</a>
         </article>
 
         <article class="card feature-card">
             <div class="icon-box">02</div>
-            <h2>Webcam realtime</h2>
+            <h2>Realtime webcam</h2>
             <p>
-                Chạy tracking trực tiếp từ webcam trên trình duyệt,
-                phù hợp để demo luồng xử lý realtime.
+                Chạy vehicle tracking trực tiếp từ webcam trên trình duyệt,
+                đồng thời có thể ghi lại video đã overlay bounding box và ID.
             </p>
             <a class="link" href="{{ url_for('webcam') }}">Mở webcam</a>
         </article>
@@ -87,26 +87,26 @@
     <section class="card">
         <div class="section-title">
             <h2>Pipeline xử lý</h2>
-            <p>Luồng xử lý chính của hệ thống.</p>
+            <p>Luồng xử lý chính của hệ thống vehicle tracking.</p>
         </div>
 
         <div class="pipeline">
             <div class="pipeline-step">
                 <span>1</span>
                 <strong>Input</strong>
-                <p>Video hoặc webcam</p>
+                <p>Traffic video hoặc webcam</p>
             </div>
             <div class="pipeline-arrow">→</div>
             <div class="pipeline-step">
                 <span>2</span>
                 <strong>YOLOv5n</strong>
-                <p>Detect person</p>
+                <p>Detect vehicle</p>
             </div>
             <div class="pipeline-arrow">→</div>
             <div class="pipeline-step">
                 <span>3</span>
                 <strong>DeepSORT</strong>
-                <p>Gán ID</p>
+                <p>Gán ID phương tiện</p>
             </div>
             <div class="pipeline-arrow">→</div>
             <div class="pipeline-step">

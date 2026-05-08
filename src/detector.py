@@ -4,12 +4,28 @@ import cv2
 from ultralytics import YOLO
 
 
+VEHICLE_CLASS_IDS = [2, 3, 5, 7]
+
+VEHICLE_CLASS_NAMES = {
+    2: "car",
+    3: "motorcycle",
+    5: "bus",
+    7: "truck"
+}
+
+
 class YOLODetector:
     """
-    YOLODetector dùng để phát hiện người trong từng frame.
+    YOLODetector dùng để phát hiện phương tiện giao thông trong từng frame.
 
     Model sử dụng:
         models/yolov5n.pt
+
+    Các class vehicle trong COCO dataset:
+        car        = 2
+        motorcycle = 3
+        bus        = 5
+        truck      = 7
 
     Output của detect() là danh sách detection dạng:
 
@@ -18,14 +34,11 @@ class YOLODetector:
                 "bbox_xyxy": [x1, y1, x2, y2],
                 "bbox_xywh": [x, y, w, h],
                 "confidence": 0.91,
-                "class_id": 0,
-                "class_name": "person"
+                "class_id": 2,
+                "class_name": "car"
             },
             ...
         ]
-
-    Trong COCO dataset:
-        class_id = 0 là person.
     """
 
     def __init__(
@@ -40,18 +53,22 @@ class YOLODetector:
         self.image_size = image_size
         self.device = device
 
+        self.target_classes = VEHICLE_CLASS_IDS
+
         # Load YOLO model
         self.model = YOLO(self.model_path)
 
     def detect(self, frame) -> List[Dict[str, Any]]:
         """
-        Phát hiện người trong một frame.
+        Phát hiện phương tiện giao thông trong một frame.
 
         Args:
-            frame: ảnh dạng numpy array, đọc từ OpenCV, định dạng BGR.
+            frame:
+                Ảnh dạng numpy array, đọc từ OpenCV, định dạng BGR.
 
         Returns:
-            List[Dict]: danh sách detection.
+            List[Dict]:
+                Danh sách detection của các phương tiện.
         """
 
         if frame is None:
@@ -59,12 +76,12 @@ class YOLODetector:
 
         height, width = frame.shape[:2]
 
-        # Chỉ detect class person = 0
+        # Chỉ detect vehicle: car, motorcycle, bus, truck
         results = self.model.predict(
             source=frame,
             imgsz=self.image_size,
             conf=self.conf_threshold,
-            classes=[0],
+            classes=self.target_classes,
             device=self.device,
             verbose=False
         )
@@ -84,6 +101,10 @@ class YOLODetector:
             confidence = float(box.conf[0].cpu().numpy())
             class_id = int(box.cls[0].cpu().numpy())
 
+            # Bảo vệ thêm: chỉ nhận class thuộc vehicle
+            if class_id not in VEHICLE_CLASS_IDS:
+                continue
+
             x1, y1, x2, y2 = xyxy
 
             # Giới hạn tọa độ nằm trong frame
@@ -98,12 +119,14 @@ class YOLODetector:
             if w <= 0 or h <= 0:
                 continue
 
+            class_name = VEHICLE_CLASS_NAMES.get(class_id, f"class_{class_id}")
+
             detections.append({
                 "bbox_xyxy": [x1, y1, x2, y2],
                 "bbox_xywh": [x1, y1, w, h],
                 "confidence": confidence,
                 "class_id": class_id,
-                "class_name": "person"
+                "class_name": class_name
             })
 
         return detections
@@ -119,8 +142,9 @@ class YOLODetector:
         for det in detections:
             x1, y1, x2, y2 = det["bbox_xyxy"]
             confidence = det["confidence"]
+            class_name = det["class_name"]
 
-            label = f"person {confidence:.2f}"
+            label = f"{class_name} {confidence:.2f}"
 
             cv2.rectangle(
                 output_frame,

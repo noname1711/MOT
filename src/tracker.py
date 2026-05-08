@@ -6,7 +6,7 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 
 class DeepSORTTracker:
     """
-    DeepSORTTracker dùng để gán ID cho các detection qua nhiều frame.
+    DeepSORTTracker dùng để gán ID cho các phương tiện qua nhiều frame.
 
     Input của update() là output từ YOLODetector.detect():
 
@@ -15,11 +15,17 @@ class DeepSORTTracker:
                 "bbox_xyxy": [x1, y1, x2, y2],
                 "bbox_xywh": [x, y, w, h],
                 "confidence": 0.91,
-                "class_id": 0,
-                "class_name": "person"
+                "class_id": 2,
+                "class_name": "car"
             },
             ...
         ]
+
+    Vehicle class theo COCO:
+        car        = 2
+        motorcycle = 3
+        bus        = 5
+        truck      = 7
 
     Output của update() là list track:
 
@@ -29,13 +35,17 @@ class DeepSORTTracker:
                 "bbox_xyxy": [x1, y1, x2, y2],
                 "bbox_xywh": [x, y, w, h],
                 "confidence": 0.91,
-                "class_id": 0,
-                "class_name": "person",
+                "class_id": 2,
+                "class_name": "car",
                 "visibility": 1,
                 "matched_iou": 0.83
             },
             ...
         ]
+
+    visibility:
+        1 -> track khớp với detection YOLO ở frame hiện tại
+        0 -> track được DeepSORT duy trì bằng dự đoán, không khớp detection hiện tại
     """
 
     def __init__(
@@ -126,7 +136,7 @@ class DeepSORTTracker:
                 matched_iou = float(matched_detection["matched_iou"])
             else:
                 # Không có detection khớp ở frame hiện tại.
-                # Đây có thể là track được DeepSORT dự đoán bằng motion model.
+                # Đây là track được DeepSORT duy trì bằng motion model.
                 confidence = 0.0
                 class_id = -1
                 class_name = "predicted"
@@ -148,7 +158,7 @@ class DeepSORTTracker:
 
     def draw_tracks(self, frame, tracks: List[Dict[str, Any]]):
         """
-        Vẽ bounding box và track ID lên frame.
+        Vẽ bounding box, vehicle ID, class và confidence lên frame.
         """
 
         output_frame = frame.copy()
@@ -194,6 +204,7 @@ class DeepSORTTracker:
     ) -> Optional[Dict[str, Any]]:
         """
         Tìm detection có IoU cao nhất với bbox của track.
+
         Detection tìm được dùng để lấy confidence/class thật từ YOLO.
         """
 
@@ -247,7 +258,7 @@ class DeepSORTTracker:
     @staticmethod
     def _get_color(track_id: str):
         """
-        Tạo màu cố định theo track_id để mỗi ID có màu riêng.
+        Tạo màu cố định theo track_id để mỗi vehicle ID có màu riêng.
         """
 
         try:

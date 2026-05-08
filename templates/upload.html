@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Upload Video - MultiTracking</title>
+    <title>Traffic Video Tracking - Vehicle Tracking</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -10,13 +10,13 @@
 <nav class="navbar">
     <div class="nav-inner">
         <a href="{{ url_for('index') }}" class="brand">
-            <span class="brand-mark">MT</span>
-            <span>MultiTracking</span>
+            <span class="brand-mark">VT</span>
+            <span>Vehicle Tracking</span>
         </a>
 
         <div class="nav-links">
             <a href="{{ url_for('index') }}">Trang chủ</a>
-            <a href="{{ url_for('upload_video') }}" class="active">Video upload</a>
+            <a href="{{ url_for('upload_video') }}" class="active">Traffic video</a>
             <a href="{{ url_for('webcam') }}">Webcam</a>
         </div>
     </div>
@@ -24,26 +24,31 @@
 
 <main class="container">
     <section class="page-header">
-        <span class="badge">Video mode</span>
-        <h1>Tracking từ video upload</h1>
+        <span class="badge">Traffic video mode</span>
+        <h1>Vehicle tracking từ video giao thông</h1>
         <p>
-            Upload video để hệ thống phát hiện người, gán ID theo thời gian,
-            lưu video kết quả, file tracking TXT và thống kê đối tượng.
+            Upload traffic video để hệ thống phát hiện phương tiện,
+            gán ID theo thời gian, lưu video kết quả, tracking TXT và thống kê theo từng phương tiện.
         </p>
     </section>
 
     <section class="card">
         <div class="section-title">
-            <h2>Upload video</h2>
-            <p>Nên dùng video ngắn 5–15 giây khi chạy thử trên CPU.</p>
+            <h2>Upload traffic video</h2>
+            <p>
+                Có thể dùng video trong thư mục
+                <code>data/vehicle_tracking/AICC22-Custom</code>
+                hoặc
+                <code>data/vehicle_tracking/VNTraffic</code>.
+            </p>
         </div>
 
         <form method="POST" enctype="multipart/form-data" class="upload-form">
-            <label for="video" class="file-label">Chọn video đầu vào</label>
+            <label for="video" class="file-label">Chọn traffic video đầu vào</label>
             <input type="file" id="video" name="video" accept="video/*" required>
 
             <button type="submit" class="button">
-                Chạy tracking
+                Chạy vehicle tracking
             </button>
         </form>
 
@@ -62,7 +67,7 @@
     <section class="card success">
         <div class="section-title">
             <h2>Xử lý hoàn tất</h2>
-            <p>Kết quả tracking và thống kê cơ bản của video.</p>
+            <p>Kết quả tracking và thống kê cơ bản của traffic video.</p>
         </div>
 
         <div class="metric-grid">
@@ -92,7 +97,7 @@
             </div>
 
             <div class="metric-card">
-                <span>Số ID tracking</span>
+                <span>Số phương tiện tracking</span>
                 <strong>{{ result.tracking_statistics.total_tracks }}</strong>
             </div>
         </div>
@@ -101,7 +106,7 @@
     <section class="card">
         <div class="section-title">
             <h2>Video kết quả</h2>
-            <p>Video đã được vẽ bounding box, ID và confidence.</p>
+            <p>Video đã được vẽ bounding box, vehicle ID, class và confidence.</p>
         </div>
 
         <video controls>
@@ -126,9 +131,9 @@
 
     <section class="card">
         <div class="section-title">
-            <h2>Thống kê đối tượng đã tracking</h2>
+            <h2>Thống kê phương tiện đã tracking</h2>
             <p>
-                Bảng thống kê theo từng ID dựa trên file tracking TXT.
+                Bảng thống kê theo từng vehicle ID dựa trên file tracking TXT.
             </p>
         </div>
 
@@ -138,10 +143,12 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Class</th>
+                        <th>Vehicle class</th>
                         <th>Frame đầu</th>
                         <th>Frame cuối</th>
                         <th>Số frame</th>
+                        <th>Detection frames</th>
+                        <th>Predicted frames</th>
                         <th>Thời lượng tracked</th>
                         <th>Vòng đời</th>
                         <th>Avg confidence</th>
@@ -156,9 +163,11 @@
                         <td>{{ track.first_frame }}</td>
                         <td>{{ track.last_frame }}</td>
                         <td>{{ track.frames_tracked }}</td>
+                        <td>{{ track.detection_frames }}</td>
+                        <td>{{ track.predicted_frames }}</td>
                         <td>{{ track.tracked_duration_seconds }}s</td>
                         <td>{{ track.lifespan_seconds }}s</td>
-                        <td>{{ track.avg_confidence }}</td>
+                        <td>{{ track.avg_detection_confidence }}</td>
                         <td>
                             x={{ track.avg_bbox.x }},
                             y={{ track.avg_bbox.y }},
@@ -171,7 +180,7 @@
             </table>
         </div>
         {% else %}
-        <p class="note">Không có đối tượng nào được tracking trong video này.</p>
+        <p class="note">Không có phương tiện nào được tracking trong video này.</p>
         {% endif %}
     </section>
 
