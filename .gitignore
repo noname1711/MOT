@@ -14,9 +14,20 @@ __pycache__/
 
 # Uploads
 uploads/*
+!uploads/.gitkeep
 
 # Static outputs
 static/outputs/*
+!static/outputs/.gitkeep
+!static/outputs/dataset/
+!static/outputs/upload/
+!static/outputs/webcam/
+static/outputs/dataset/*
+static/outputs/upload/*
+static/outputs/webcam/*
+!static/outputs/dataset/.gitkeep
+!static/outputs/upload/.gitkeep
+!static/outputs/webcam/.gitkeep
 
 # Results
 results/dataset/videos/*
@@ -28,3 +39,16 @@ results/upload/metrics/*
 results/webcam/videos/*
 results/webcam/txt/*
 results/webcam/metrics/*
+
+!results/dataset/videos/.gitkeep
+!results/dataset/txt/.gitkeep
+!results/dataset/metrics/.gitkeep
+!results/upload/videos/.gitkeep
+!results/upload/txt/.gitkeep
+!results/upload/metrics/.gitkeep
+!results/webcam/videos/.gitkeep
+!results/webcam/txt/.gitkeep
+!results/webcam/metrics/.gitkeep
+
+# Temporary videos
+*_temp.mp4
