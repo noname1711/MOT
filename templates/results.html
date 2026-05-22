@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Results{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Experiment Outputs</div>
+        <h1>Results</h1>
+        <p>
+            Kết quả được gom theo từng lần chạy. Mỗi card gồm output video,
+            tracking TXT và metrics JSON tương ứng.
+        </p>
+    </div>
+</section>
+
+<section class="results-by-mode">
+    {% for mode, runs in results.items() %}
+    <div class="mode-section">
+        <div class="mode-header">
+            <div>
+                <h2>{{ mode|upper }}</h2>
+                <p>{{ runs|length }} lần chạy</p>
+            </div>
+        </div>
+
+        {% if runs %}
+        <div class="run-grid">
+            {% for run in runs %}
+            <article class="panel run-card">
+                <div class="run-card-header">
+                    <div>
+                        <div class="eyebrow">{{ run.mode }}</div>
+                        <h3>{{ run.display_name }}</h3>
+                        <p>{{ run.display_time }}</p>
+                    </div>
+
+                    <span class="run-id">{{ run.run_id }}</span>
+                </div>
+
+                <div class="run-files">
+                    <div class="run-file-row">
+                        <div>
+                            <strong>Output Video</strong>
+                            {% if run.video %}
+                                <span>{{ run.video.filename }}</span>
+                            {% else %}
+                                <span class="missing">Chưa có video</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="file-actions">
+                            {% if run.video %}
+                                {% if run.video.open_url %}
+                                    <a href="{{ run.video.open_url }}" target="_blank">Open</a>
+                                {% endif %}
+                                <a href="{{ run.video.download_url }}">Download</a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="run-file-row">
+                        <div>
+                            <strong>Tracking TXT</strong>
+                            {% if run.txt %}
+                                <span>{{ run.txt.filename }}</span>
+                            {% else %}
+                                <span class="missing">Chưa có TXT</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="file-actions">
+                            {% if run.txt %}
+                                <a href="{{ run.txt.download_url }}">Download</a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="run-file-row">
+                        <div>
+                            <strong>Metrics JSON</strong>
+                            {% if run.metrics %}
+                                <span>{{ run.metrics.filename }}</span>
+                            {% else %}
+                                <span class="missing">Chưa có metrics</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="file-actions">
+                            {% if run.metrics %}
+                                <a href="{{ run.metrics.download_url }}">Download</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="panel empty-result">
+            Chưa có kết quả cho mode này.
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</section>
+{% endblock %}

@@ -9,12 +9,22 @@ __pycache__/
 .vscode/
 .idea/
 
-# Data and outputs
-uploads/*
-static/outputs/*
-results/videos/*
-results/txt/*
-results/metrics/*
-
 # Logs
 *.log
+
+# Uploads
+uploads/*
+
+# Static outputs
+static/outputs/*
+
+# Results
+results/dataset/videos/*
+results/dataset/txt/*
+results/dataset/metrics/*
+results/upload/videos/*
+results/upload/txt/*
+results/upload/metrics/*
+results/webcam/videos/*
+results/webcam/txt/*
+results/webcam/metrics/*

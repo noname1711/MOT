@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Dataset Evaluation{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Ground Truth Evaluation</div>
+        <h1>Dataset Mode</h1>
+        <p>Chạy hệ thống trên dataset có ground truth để đánh giá detection và tracking.</p>
+    </div>
+</section>
+
+<section class="panel">
+    <form method="post" class="form-row">
+        <div class="form-group">
+            <label>Chọn dataset</label>
+            <select name="dataset_name" required>
+                {% for dataset in datasets %}
+                    <option value="{{ dataset.name }}">{{ dataset.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button class="btn btn-primary" type="submit">Run Evaluation</button>
+    </form>
+
+    {% if not datasets %}
+        <div class="alert alert-warning">
+            Không tìm thấy dataset trong <code>data/vehicle_tracking</code>.
+        </div>
+    {% endif %}
+
+    {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+</section>
+
+{% if result %}
+<section class="section">
+    <div class="result-title">
+        <div>
+            <div class="eyebrow">Run ID</div>
+            <h2>{{ result.run_id }}</h2>
+        </div>
+
+        <div class="download-group">
+            <a class="btn btn-secondary" href="{{ result.video_download_url }}">Download Video</a>
+            <a class="btn btn-secondary" href="{{ result.txt_download_url }}">Download TXT</a>
+            <a class="btn btn-secondary" href="{{ result.metrics_download_url }}">Download Metrics</a>
+        </div>
+    </div>
+
+    <div class="video-panel">
+        <video controls>
+            <source src="{{ result.video_url }}" type="video/mp4">
+        </video>
+    </div>
+</section>
+
+<section class="section">
+    <div class="section-heading">
+        <h2>Evaluation Metrics</h2>
+        <p>Các chỉ số đánh giá với ground truth. Đây là evaluation proxy dựa trên IoU matching.</p>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card primary">
+            <span>Precision</span>
+            <strong>{{ result.metrics.evaluation.precision | default(0) }}</strong>
+            <small>Dự đoán đúng / tổng dự đoán</small>
+        </div>
+
+        <div class="metric-card primary">
+            <span>Recall</span>
+            <strong>{{ result.metrics.evaluation.recall | default(0) }}</strong>
+            <small>Phát hiện đúng / tổng ground truth</small>
+        </div>
+
+        <div class="metric-card primary">
+            <span>F1-score</span>
+            <strong>{{ result.metrics.evaluation.f1_score | default(0) }}</strong>
+            <small>Cân bằng precision và recall</small>
+        </div>
+
+        <div class="metric-card">
+            <span>MOTA Proxy</span>
+            <strong>{{ result.metrics.evaluation.mota_proxy | default(0) }}</strong>
+            <small>Tracking accuracy proxy</small>
+        </div>
+
+        <div class="metric-card">
+            <span>MOTP Proxy</span>
+            <strong>{{ result.metrics.evaluation.motp_proxy | default(0) }}</strong>
+            <small>Độ khớp bbox trung bình</small>
+        </div>
+
+        <div class="metric-card">
+            <span>ID Switches</span>
+            <strong>{{ result.metrics.evaluation.id_switches_proxy | default(0) }}</strong>
+            <small>Số lần đổi ID ước lượng</small>
+        </div>
+
+        <div class="metric-card">
+            <span>False Positive</span>
+            <strong>{{ result.metrics.evaluation.false_positive | default(0) }}</strong>
+            <small>Dự đoán thừa</small>
+        </div>
+
+        <div class="metric-card">
+            <span>False Negative</span>
+            <strong>{{ result.metrics.evaluation.false_negative | default(0) }}</strong>
+            <small>Bỏ sót object</small>
+        </div>
+    </div>
+</section>
+
+<section class="section two-columns">
+    <div class="panel">
+        <h3>Ground Truth Statistics</h3>
+        <div class="stats-list">
+            <div><span>Total GT boxes</span><strong>{{ result.metrics.groundtruth_statistics.total_groundtruth_boxes }}</strong></div>
+            <div><span>Total GT tracks</span><strong>{{ result.metrics.groundtruth_statistics.total_groundtruth_tracks }}</strong></div>
+            <div><span>Annotated frames</span><strong>{{ result.metrics.groundtruth_statistics.annotated_frames }}</strong></div>
+            <div><span>Avg objects/frame</span><strong>{{ result.metrics.groundtruth_statistics.avg_objects_per_frame }}</strong></div>
+            <div><span>Max objects/frame</span><strong>{{ result.metrics.groundtruth_statistics.max_objects_per_frame }}</strong></div>
+            <div><span>Avg track length</span><strong>{{ result.metrics.groundtruth_statistics.avg_track_length_frames }}</strong></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Prediction Statistics</h3>
+        <div class="stats-list">
+            <div><span>Total prediction rows</span><strong>{{ result.metrics.prediction_statistics.total_prediction_rows }}</strong></div>
+            <div><span>Visible predictions</span><strong>{{ result.metrics.prediction_statistics.total_visible_prediction_rows }}</strong></div>
+            <div><span>Unique predicted tracks</span><strong>{{ result.metrics.prediction_statistics.unique_predicted_tracks }}</strong></div>
+            <div><span>Avg predicted objects/frame</span><strong>{{ result.metrics.prediction_statistics.avg_predicted_objects_per_frame }}</strong></div>
+            <div><span>Max predicted objects/frame</span><strong>{{ result.metrics.prediction_statistics.max_predicted_objects_per_frame }}</strong></div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="panel">
+        <h3>System Performance</h3>
+        <div class="metrics-grid compact">
+            <div class="metric-card">
+                <span>Processing FPS</span>
+                <strong>{{ result.metrics.performance.processing_fps }}</strong>
+            </div>
+            <div class="metric-card">
+                <span>Runtime</span>
+                <strong>{{ result.metrics.performance.elapsed_time_sec }}s</strong>
+            </div>
+            <div class="metric-card">
+                <span>Detector Time</span>
+                <strong>{{ result.metrics.performance.avg_detector_time_ms }}ms</strong>
+            </div>
+            <div class="metric-card">
+                <span>Tracker Time</span>
+                <strong>{{ result.metrics.performance.avg_tracker_time_ms }}ms</strong>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <details class="raw-json">
+        <summary>Xem toàn bộ metrics JSON</summary>
+        <pre>{{ result.metrics | tojson(indent=2) }}</pre>
+    </details>
+</section>
+{% endif %}
+{% endblock %}

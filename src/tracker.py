@@ -1,51 +1,11 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
-import cv2
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
 
 class DeepSORTTracker:
     """
-    DeepSORTTracker dùng để gán ID cho các phương tiện qua nhiều frame.
-
-    Input của update() là output từ YOLODetector.detect():
-
-        [
-            {
-                "bbox_xyxy": [x1, y1, x2, y2],
-                "bbox_xywh": [x, y, w, h],
-                "confidence": 0.91,
-                "class_id": 2,
-                "class_name": "car"
-            },
-            ...
-        ]
-
-    Vehicle class theo COCO:
-        car        = 2
-        motorcycle = 3
-        bus        = 5
-        truck      = 7
-
-    Output của update() là list track:
-
-        [
-            {
-                "track_id": "1",
-                "bbox_xyxy": [x1, y1, x2, y2],
-                "bbox_xywh": [x, y, w, h],
-                "confidence": 0.91,
-                "class_id": 2,
-                "class_name": "car",
-                "visibility": 1,
-                "matched_iou": 0.83
-            },
-            ...
-        ]
-
-    visibility:
-        1 -> track khớp với detection YOLO ở frame hiện tại
-        0 -> track được DeepSORT duy trì bằng dự đoán, không khớp detection hiện tại
+    Wrapper DeepSORT dùng để gán ID cho detections từ YOLO.
     """
 
     def __init__(
@@ -67,40 +27,31 @@ class DeepSORTTracker:
         )
 
     def update(self, detections: List[Dict[str, Any]], frame) -> List[Dict[str, Any]]:
-        """
-        Cập nhật tracker bằng detection của frame hiện tại.
-
-        Với mỗi track, hàm này tìm detection hiện tại có IoU cao nhất
-        để lấy confidence/class thật từ YOLO.
-        """
-
         if frame is None:
             return []
 
-        height, width = frame.shape[:2]
+        frame_height, frame_width = frame.shape[:2]
 
         deepsort_detections = []
 
         for det in detections:
             x, y, w, h = det["bbox_xywh"]
-            confidence = det["confidence"]
-            class_name = det["class_name"]
 
             if w <= 0 or h <= 0:
                 continue
 
-            # Format của deep-sort-realtime:
-            # ([left, top, width, height], confidence, class_name)
-            deepsort_detections.append(
-                ([x, y, w, h], confidence, class_name)
-            )
+            deepsort_detections.append((
+                [x, y, w, h],
+                float(det["confidence"]),
+                str(det["class_name"])
+            ))
 
         raw_tracks = self.tracker.update_tracks(
             deepsort_detections,
             frame=frame
         )
 
-        tracks = []
+        tracks: List[Dict[str, Any]] = []
 
         for track in raw_tracks:
             if not track.is_confirmed():
@@ -109,10 +60,11 @@ class DeepSORTTracker:
             track_id = str(track.track_id)
 
             x1, y1, x2, y2 = track.to_ltrb()
-            x1 = int(max(0, x1))
-            y1 = int(max(0, y1))
-            x2 = int(min(width - 1, x2))
-            y2 = int(min(height - 1, y2))
+
+            x1 = int(max(0, min(frame_width - 1, x1)))
+            y1 = int(max(0, min(frame_height - 1, y1)))
+            x2 = int(max(0, min(frame_width - 1, x2)))
+            y2 = int(max(0, min(frame_height - 1, y2)))
 
             w = x2 - x1
             h = y2 - y1
@@ -120,10 +72,10 @@ class DeepSORTTracker:
             if w <= 0 or h <= 0:
                 continue
 
-            track_bbox_xyxy = [x1, y1, x2, y2]
+            track_bbox = [x1, y1, x2, y2]
 
             matched_detection = self._find_best_detection_for_track(
-                track_bbox_xyxy=track_bbox_xyxy,
+                track_bbox_xyxy=track_bbox,
                 detections=detections,
                 iou_threshold=0.1
             )
@@ -135,8 +87,6 @@ class DeepSORTTracker:
                 visibility = 1
                 matched_iou = float(matched_detection["matched_iou"])
             else:
-                # Không có detection khớp ở frame hiện tại.
-                # Đây là track được DeepSORT duy trì bằng motion model.
                 confidence = 0.0
                 class_id = -1
                 class_name = "predicted"
@@ -145,7 +95,7 @@ class DeepSORTTracker:
 
             tracks.append({
                 "track_id": track_id,
-                "bbox_xyxy": track_bbox_xyxy,
+                "bbox_xyxy": track_bbox,
                 "bbox_xywh": [x1, y1, w, h],
                 "confidence": confidence,
                 "class_id": class_id,
@@ -156,64 +106,17 @@ class DeepSORTTracker:
 
         return tracks
 
-    def draw_tracks(self, frame, tracks: List[Dict[str, Any]]):
-        """
-        Vẽ bounding box, vehicle ID, class và confidence lên frame.
-        """
-
-        output_frame = frame.copy()
-
-        for track in tracks:
-            x1, y1, x2, y2 = track["bbox_xyxy"]
-            track_id = track["track_id"]
-            class_name = track["class_name"]
-            confidence = track.get("confidence", 0.0)
-
-            if track.get("visibility", 0) == 1:
-                label = f"ID {track_id} | {class_name} {confidence:.2f}"
-            else:
-                label = f"ID {track_id} | predicted"
-
-            color = self._get_color(track_id)
-
-            cv2.rectangle(
-                output_frame,
-                (x1, y1),
-                (x2, y2),
-                color,
-                2
-            )
-
-            cv2.putText(
-                output_frame,
-                label,
-                (x1, max(20, y1 - 10)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                color,
-                2
-            )
-
-        return output_frame
-
     @staticmethod
     def _find_best_detection_for_track(
         track_bbox_xyxy: List[int],
         detections: List[Dict[str, Any]],
         iou_threshold: float = 0.1
     ) -> Optional[Dict[str, Any]]:
-        """
-        Tìm detection có IoU cao nhất với bbox của track.
-
-        Detection tìm được dùng để lấy confidence/class thật từ YOLO.
-        """
-
         best_detection = None
         best_iou = 0.0
 
         for det in detections:
-            det_bbox_xyxy = det["bbox_xyxy"]
-            iou = DeepSORTTracker._compute_iou(track_bbox_xyxy, det_bbox_xyxy)
+            iou = DeepSORTTracker.compute_iou(track_bbox_xyxy, det["bbox_xyxy"])
 
             if iou > best_iou:
                 best_iou = iou
@@ -222,17 +125,13 @@ class DeepSORTTracker:
         if best_detection is None or best_iou < iou_threshold:
             return None
 
-        matched_detection = dict(best_detection)
-        matched_detection["matched_iou"] = best_iou
+        matched = dict(best_detection)
+        matched["matched_iou"] = best_iou
 
-        return matched_detection
+        return matched
 
     @staticmethod
-    def _compute_iou(box_a: List[int], box_b: List[int]) -> float:
-        """
-        Tính IoU giữa hai bounding box dạng [x1, y1, x2, y2].
-        """
-
+    def compute_iou(box_a: List[float], box_b: List[float]) -> float:
         ax1, ay1, ax2, ay2 = box_a
         bx1, by1, bx2, by2 = box_b
 
@@ -241,12 +140,12 @@ class DeepSORTTracker:
         inter_x2 = min(ax2, bx2)
         inter_y2 = min(ay2, by2)
 
-        inter_w = max(0, inter_x2 - inter_x1)
-        inter_h = max(0, inter_y2 - inter_y1)
+        inter_w = max(0.0, inter_x2 - inter_x1)
+        inter_h = max(0.0, inter_y2 - inter_y1)
         inter_area = inter_w * inter_h
 
-        area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
-        area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+        area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+        area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
 
         union_area = area_a + area_b - inter_area
 
@@ -254,20 +153,3 @@ class DeepSORTTracker:
             return 0.0
 
         return inter_area / union_area
-
-    @staticmethod
-    def _get_color(track_id: str):
-        """
-        Tạo màu cố định theo track_id để mỗi vehicle ID có màu riêng.
-        """
-
-        try:
-            track_num = int(track_id)
-        except ValueError:
-            track_num = sum(ord(c) for c in track_id)
-
-        r = (37 * track_num) % 255
-        g = (17 * track_num) % 255
-        b = (29 * track_num) % 255
-
-        return int(b), int(g), int(r)

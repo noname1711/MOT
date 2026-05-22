@@ -1,184 +1,188 @@
-document.addEventListener("DOMContentLoaded", () => {
-    initWebcamRecording();
-});
-
-
-function initWebcamRecording() {
-    const startRecordBtn = document.getElementById("start-record-btn");
-    const stopRecordBtn = document.getElementById("stop-record-btn");
-    const recordStatus = document.getElementById("record-status");
-    const recordResult = document.getElementById("record-result");
-    const recordedVideo = document.getElementById("recorded-video");
-    const downloadRecordLink = document.getElementById("download-record-link");
-    const openRecordLink = document.getElementById("open-record-link");
-
-    if (!startRecordBtn || !stopRecordBtn || !recordStatus) {
-        return;
-    }
-
-    const startUrl = startRecordBtn.dataset.startUrl;
-    const stopUrl = stopRecordBtn.dataset.stopUrl;
-
-    startRecordBtn.addEventListener("click", () => {
-        startWebcamRecording({
-            startUrl,
-            startRecordBtn,
-            stopRecordBtn,
-            recordStatus,
-            recordResult
-        });
-    });
-
-    stopRecordBtn.addEventListener("click", () => {
-        stopWebcamRecording({
-            stopUrl,
-            startRecordBtn,
-            stopRecordBtn,
-            recordStatus,
-            recordResult,
-            recordedVideo,
-            downloadRecordLink,
-            openRecordLink
-        });
-    });
-}
-
-
-async function startWebcamRecording({
-    startUrl,
-    startRecordBtn,
-    stopRecordBtn,
-    recordStatus,
-    recordResult
-}) {
-    setButtonState(startRecordBtn, true);
-    setButtonState(stopRecordBtn, false);
-    setStatus(recordStatus, "Trạng thái: đang bắt đầu ghi hình...");
-
-    hideElement(recordResult);
-
-    try {
-        const data = await postJson(startUrl);
-
-        if (data.success) {
-            setStatus(recordStatus, `Trạng thái: đang ghi hình (${data.filename}).`);
-            return;
-        }
-
-        setStatus(recordStatus, `Lỗi: ${data.message}`);
-        setButtonState(startRecordBtn, false);
-        setButtonState(stopRecordBtn, true);
-    } catch (error) {
-        setStatus(recordStatus, "Lỗi: không thể bắt đầu ghi hình.");
-        setButtonState(startRecordBtn, false);
-        setButtonState(stopRecordBtn, true);
-    }
-}
-
-
-async function stopWebcamRecording({
-    stopUrl,
-    startRecordBtn,
-    stopRecordBtn,
-    recordStatus,
-    recordResult,
-    recordedVideo,
-    downloadRecordLink,
-    openRecordLink
-}) {
-    setButtonState(stopRecordBtn, true);
-    setStatus(recordStatus, "Trạng thái: đang dừng và xử lý video...");
-
-    try {
-        const data = await postJson(stopUrl);
-
-        if (data.success) {
-            setStatus(recordStatus, `Trạng thái: đã ghi xong ${data.frame_count} frame.`);
-
-            updateRecordedVideo(recordedVideo, data.video_url);
-            updateLink(downloadRecordLink, data.download_url);
-            updateLink(openRecordLink, data.video_url);
-            showElement(recordResult);
-        } else {
-            setStatus(recordStatus, `Lỗi: ${data.message}`);
-        }
-    } catch (error) {
-        setStatus(recordStatus, "Lỗi: không thể dừng ghi hình.");
-    }
-
-    setButtonState(startRecordBtn, false);
-}
-
-
 async function postJson(url) {
-    const response = await fetch(url, {
-        method: "POST"
+    const response = await fetch(url, { method: "POST" });
+    return await response.json();
+}
+
+async function getJson(url) {
+    const response = await fetch(url);
+    return await response.json();
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+
+    if (el) {
+        el.textContent = value;
+    }
+}
+
+function isWebcamPage() {
+    return document.getElementById("metric-live-fps") !== null;
+}
+
+function stopWebcamWorkerSync() {
+    if (!isWebcamPage()) {
+        return;
+    }
+
+    try {
+        navigator.sendBeacon("/webcam/stop_worker");
+    } catch (error) {
+        fetch("/webcam/stop_worker", {
+            method: "POST",
+            keepalive: true
+        }).catch(() => {});
+    }
+}
+
+async function startWebcamWorker() {
+    if (!isWebcamPage()) {
+        return;
+    }
+
+    try {
+        await postJson("/webcam/start_worker");
+    } catch (error) {
+        console.warn("Cannot start webcam worker:", error);
+    }
+}
+
+function renderRecordingResult(data) {
+    const box = document.getElementById("recording-result");
+
+    if (!box) {
+        return;
+    }
+
+    if (!data.success) {
+        box.innerHTML = `
+            <div class="alert alert-error">${data.message || "Recording failed."}</div>
+        `;
+        return;
+    }
+
+    let links = "";
+
+    if (data.video_url) {
+        links += `<a class="btn btn-secondary" href="${data.video_url}" target="_blank">Open Video</a>`;
+    }
+
+    if (data.video_download_url) {
+        links += `<a class="btn btn-secondary" href="${data.video_download_url}">Download Video</a>`;
+    }
+
+    if (data.txt_download_url) {
+        links += `<a class="btn btn-secondary" href="${data.txt_download_url}">Download TXT</a>`;
+    }
+
+    if (data.metrics_download_url) {
+        links += `<a class="btn btn-secondary" href="${data.metrics_download_url}">Download Metrics</a>`;
+    }
+
+    box.innerHTML = `
+        <div class="record-card">
+            <h4>${data.message || "Recording completed."}</h4>
+
+            <div class="stats-list">
+                <div><span>Run ID</span><strong>${data.run_id || "-"}</strong></div>
+                <div><span>Frames</span><strong>${data.frame_count || 0}</strong></div>
+                <div><span>Duration</span><strong>${data.duration_sec || 0}s</strong></div>
+                <div><span>Average FPS</span><strong>${data.fps || 0}</strong></div>
+                <div><span>Unique Tracks</span><strong>${data.unique_tracks || 0}</strong></div>
+                <div><span>Max Active Tracks</span><strong>${data.max_active_tracks || 0}</strong></div>
+            </div>
+
+            <div class="download-group">${links}</div>
+        </div>
+    `;
+}
+
+const startBtn = document.getElementById("start-record");
+const stopBtn = document.getElementById("stop-record");
+
+if (startBtn) {
+    startBtn.addEventListener("click", async () => {
+        startBtn.disabled = true;
+
+        const data = await postJson("/webcam/start_record");
+        renderRecordingResult(data);
+
+        startBtn.disabled = false;
+    });
+}
+
+if (stopBtn) {
+    stopBtn.addEventListener("click", async () => {
+        stopBtn.disabled = true;
+
+        const data = await postJson("/webcam/stop_record");
+        renderRecordingResult(data);
+
+        stopBtn.disabled = false;
+    });
+}
+
+async function refreshWebcamMetrics() {
+    const liveFpsEl = document.getElementById("metric-live-fps");
+
+    if (!liveFpsEl) {
+        return;
+    }
+
+    try {
+        const data = await getJson("/webcam/metrics");
+
+        setText("metric-live-fps", data.live_fps ?? 0);
+        setText("metric-average-fps", data.average_fps ?? 0);
+        setText("metric-current-vehicles", data.current_active_tracks ?? 0);
+        setText("metric-total-ids", data.total_unique_tracks ?? 0);
+        setText("metric-max-active", data.max_active_tracks ?? 0);
+        setText("metric-session-frames", data.session_frames ?? 0);
+        setText("metric-duration", `${data.session_duration_sec ?? 0}s`);
+
+        const recordingText = data.is_recording
+            ? `ON (${data.record_frame_count ?? 0} frames)`
+            : "OFF";
+
+        setText("metric-recording", recordingText);
+        setText("metric-camera", data.camera_opened ? "ON" : "OFF");
+        setText("metric-worker", data.worker_running ? "ON" : "OFF");
+
+        const box = document.getElementById("recording-result");
+
+        if (box && data.latest_error) {
+            box.innerHTML = `<div class="alert alert-error">${data.latest_error}</div>`;
+        }
+    } catch (error) {
+        setText("metric-live-fps", "ERR");
+        setText("metric-worker", "ERR");
+    }
+}
+
+/*
+    Webcam lifecycle:
+    - Vào /webcam: app.py đã start worker.
+    - Rời trang / đóng tab / reload: stop worker để tắt camera laptop.
+    - Chuyển sang browser tab khác: stop worker để tắt camera.
+    - Quay lại tab webcam: start worker lại.
+*/
+if (isWebcamPage()) {
+    window.addEventListener("pagehide", () => {
+        stopWebcamWorkerSync();
     });
 
-    if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-    }
+    window.addEventListener("beforeunload", () => {
+        stopWebcamWorkerSync();
+    });
 
-    return response.json();
-}
+    document.addEventListener("visibilitychange", async () => {
+        if (document.hidden) {
+            stopWebcamWorkerSync();
+        } else {
+            await startWebcamWorker();
+        }
+    });
 
-
-function updateRecordedVideo(videoElement, videoUrl) {
-    if (!videoElement || !videoUrl) {
-        return;
-    }
-
-    videoElement.innerHTML = "";
-
-    const source = document.createElement("source");
-    source.src = videoUrl;
-    source.type = "video/mp4";
-
-    videoElement.appendChild(source);
-    videoElement.load();
-}
-
-
-function updateLink(linkElement, url) {
-    if (!linkElement || !url) {
-        return;
-    }
-
-    linkElement.href = url;
-}
-
-
-function setButtonState(button, isDisabled) {
-    if (!button) {
-        return;
-    }
-
-    button.disabled = isDisabled;
-}
-
-
-function setStatus(statusElement, message) {
-    if (!statusElement) {
-        return;
-    }
-
-    statusElement.textContent = message;
-}
-
-
-function showElement(element) {
-    if (!element) {
-        return;
-    }
-
-    element.classList.remove("is-hidden");
-}
-
-
-function hideElement(element) {
-    if (!element) {
-        return;
-    }
-
-    element.classList.add("is-hidden");
+    setInterval(refreshWebcamMetrics, 1000);
+    refreshWebcamMetrics();
 }

@@ -1,121 +1,101 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <title>Vehicle Tracking System</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-<nav class="navbar">
-    <div class="nav-inner">
-        <a href="{{ url_for('index') }}" class="brand">
-            <span class="brand-mark">VT</span>
-            <span>Vehicle Tracking</span>
-        </a>
+{% extends "base.html" %}
 
-        <div class="nav-links">
-            <a href="{{ url_for('index') }}" class="active">Trang chủ</a>
-            <a href="{{ url_for('upload_video') }}">Traffic video</a>
-            <a href="{{ url_for('webcam') }}">Webcam</a>
+{% block title %}Multi Vehicle Tracking{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-content">
+        <div class="eyebrow">AI Vehicle Tracking System</div>
+        <h1>Multi Vehicle Tracking bằng YOLOv5 và DeepSORT</h1>
+        <p>
+            Hệ thống phát hiện, theo dõi và đánh giá phương tiện giao thông trên dataset,
+            video upload và webcam realtime.
+        </p>
+
+        <div class="hero-actions">
+            <a class="btn btn-primary" href="{{ url_for('dataset_page') }}">Chạy Dataset Evaluation</a>
+            <a class="btn btn-secondary" href="{{ url_for('upload_video') }}">Upload Video</a>
         </div>
     </div>
-</nav>
 
-<main class="container">
-    <section class="hero">
-        <div class="hero-content">
-            <span class="badge">YOLOv5n + DeepSORT · Vehicle Tracking · CPU Local Web</span>
-            <h1>Theo vết phương tiện giao thông trên web local</h1>
-            <p>
-                Hệ thống hỗ trợ phát hiện và theo vết phương tiện giao thông,
-                gán ID theo thời gian, xử lý traffic video upload và tracking trực tiếp từ webcam.
-            </p>
-
-            <div class="hero-actions">
-                <a class="button" href="{{ url_for('upload_video') }}">
-                    Tracking từ traffic video
-                </a>
-                <a class="button secondary" href="{{ url_for('webcam') }}">
-                    Tracking từ webcam
-                </a>
-            </div>
+    <div class="hero-panel">
+        <div class="system-card">
+            <span class="status-dot"></span>
+            <p>Model</p>
+            <h3>YOLOv5n + DeepSORT</h3>
         </div>
 
-        <div class="hero-panel">
-            <div class="panel-row">
-                <span>Detector</span>
-                <strong>YOLOv5n</strong>
+        <div class="mini-grid">
+            <div>
+                <strong>3</strong>
+                <span>Processing Modes</span>
             </div>
-            <div class="panel-row">
-                <span>Tracker</span>
-                <strong>DeepSORT</strong>
+            <div>
+                <strong>4</strong>
+                <span>Vehicle Classes</span>
             </div>
-            <div class="panel-row">
-                <span>Target</span>
-                <strong>Car, Motorcycle, Bus, Truck</strong>
+            <div>
+                <strong>GT</strong>
+                <span>Dataset Metrics</span>
             </div>
-            <div class="panel-row">
-                <span>Output</span>
-                <strong>Video + TXT + Metrics</strong>
-            </div>
-        </div>
-    </section>
-
-    <section class="grid-2">
-        <article class="card feature-card">
-            <div class="icon-box">01</div>
-            <h2>Traffic video upload</h2>
-            <p>
-                Upload video giao thông, hệ thống sẽ phát hiện phương tiện,
-                gán ID, xuất video kết quả và file tracking theo từng frame.
-            </p>
-            <a class="link" href="{{ url_for('upload_video') }}">Mở chức năng upload</a>
-        </article>
-
-        <article class="card feature-card">
-            <div class="icon-box">02</div>
-            <h2>Realtime webcam</h2>
-            <p>
-                Chạy vehicle tracking trực tiếp từ webcam trên trình duyệt,
-                đồng thời có thể ghi lại video đã overlay bounding box và ID.
-            </p>
-            <a class="link" href="{{ url_for('webcam') }}">Mở webcam</a>
-        </article>
-    </section>
-
-    <section class="card">
-        <div class="section-title">
-            <h2>Pipeline xử lý</h2>
-            <p>Luồng xử lý chính của hệ thống vehicle tracking.</p>
-        </div>
-
-        <div class="pipeline">
-            <div class="pipeline-step">
-                <span>1</span>
-                <strong>Input</strong>
-                <p>Traffic video hoặc webcam</p>
-            </div>
-            <div class="pipeline-arrow">→</div>
-            <div class="pipeline-step">
-                <span>2</span>
-                <strong>YOLOv5n</strong>
-                <p>Detect vehicle</p>
-            </div>
-            <div class="pipeline-arrow">→</div>
-            <div class="pipeline-step">
-                <span>3</span>
-                <strong>DeepSORT</strong>
-                <p>Gán ID phương tiện</p>
-            </div>
-            <div class="pipeline-arrow">→</div>
-            <div class="pipeline-step">
-                <span>4</span>
-                <strong>Output</strong>
-                <p>Video, TXT, metrics</p>
+            <div>
+                <strong>Live</strong>
+                <span>Webcam Stream</span>
             </div>
         </div>
-    </section>
-</main>
-</body>
-</html>
+    </div>
+</section>
+
+<section class="section">
+    <div class="section-heading">
+        <h2>Chức năng chính</h2>
+        <p>Mỗi mode có cách đánh giá riêng, phù hợp với loại dữ liệu đầu vào.</p>
+    </div>
+
+    <div class="cards-grid">
+        <a class="feature-card" href="{{ url_for('dataset_page') }}">
+            <div class="icon-box">D</div>
+            <h3>Dataset Mode</h3>
+            <p>Chạy trên AICC22-Custom hoặc VNTraffic, có ground truth để đánh giá mô hình.</p>
+            <ul>
+                <li>Precision / Recall / F1</li>
+                <li>MOTA proxy / MOTP proxy</li>
+                <li>ID switches proxy</li>
+            </ul>
+        </a>
+
+        <a class="feature-card" href="{{ url_for('upload_video') }}">
+            <div class="icon-box">U</div>
+            <h3>Upload Mode</h3>
+            <p>Upload video bất kỳ và phân tích hành vi tracking khi không có ground truth.</p>
+            <ul>
+                <li>Unique tracked vehicles</li>
+                <li>Average vehicles/frame</li>
+                <li>Short track ratio</li>
+            </ul>
+        </a>
+
+        <a class="feature-card" href="{{ url_for('webcam') }}">
+            <div class="icon-box">W</div>
+            <h3>Webcam Mode</h3>
+            <p>Stream camera realtime, hiển thị tracking trực tiếp và thống kê live.</p>
+            <ul>
+                <li>Live FPS</li>
+                <li>Total unique IDs</li>
+                <li>Max active vehicles</li>
+            </ul>
+        </a>
+
+        <a class="feature-card" href="{{ url_for('results_page') }}">
+            <div class="icon-box">R</div>
+            <h3>Results</h3>
+            <p>Quản lý video, file tracking TXT và metrics JSON của các lần chạy.</p>
+            <ul>
+                <li>Dataset results</li>
+                <li>Upload results</li>
+                <li>Webcam records</li>
+            </ul>
+        </a>
+    </div>
+</section>
+{% endblock %}

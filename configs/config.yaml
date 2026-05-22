@@ -1,0 +1,24 @@
+app:
+  host: "0.0.0.0"
+  port: 5000
+  debug: true
+
+model:
+  yolo_model_path: "models/yolov5n.pt"
+  conf_threshold: 0.35
+  image_size: 416
+  device: "cpu"
+
+tracker:
+  max_age: 30
+  n_init: 3
+  max_cosine_distance: 0.4
+
+paths:
+  dataset_root: "data/vehicle_tracking"
+  upload_dir: "uploads"
+  static_outputs: "static/outputs"
+  results_dir: "results"
+
+video:
+  allowed_extensions: ["mp4", "avi", "mov", "mkv"]

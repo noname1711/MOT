@@ -1,118 +1,100 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <title>Realtime Vehicle Tracking - Vehicle Tracking</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-<nav class="navbar">
-    <div class="nav-inner">
-        <a href="{{ url_for('index') }}" class="brand">
-            <span class="brand-mark">VT</span>
-            <span>Vehicle Tracking</span>
-        </a>
+{% extends "base.html" %}
 
-        <div class="nav-links">
-            <a href="{{ url_for('index') }}">Trang chủ</a>
-            <a href="{{ url_for('upload_video') }}">Traffic video</a>
-            <a href="{{ url_for('webcam') }}" class="active">Webcam</a>
+{% block title %}Webcam Realtime Tracking{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <div class="eyebrow">Realtime Monitoring</div>
+        <h1>Webcam Mode</h1>
+        <p>Stream camera realtime, theo dõi phương tiện trực tiếp và ghi lại phiên tracking.</p>
+    </div>
+</section>
+
+<section class="webcam-layout">
+    <div class="panel webcam-stream-panel">
+        <div class="stream-header">
+            <h2>Live Stream</h2>
+            <span class="live-badge">LIVE</span>
+        </div>
+
+        <div class="webcam-frame">
+            <img src="{{ url_for('webcam_feed') }}" alt="webcam stream">
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" id="start-record">Start Record</button>
+            <button class="btn btn-danger" id="stop-record">Stop Record</button>
         </div>
     </div>
-</nav>
 
-<main class="container">
-    <section class="page-header">
-        <span class="badge">Realtime vehicle mode</span>
-        <h1>Vehicle tracking từ webcam</h1>
-        <p>
-            YOLOv5n phát hiện phương tiện và DeepSORT gán ID trực tiếp từ webcam.
-            Có thể ghi lại video đã overlay bounding box, vehicle ID, class và confidence.
-        </p>
-    </section>
+    <aside class="webcam-side">
+        <div class="panel">
+            <h3>Live Metrics</h3>
 
-    <section class="card">
-        <div class="section-title">
-            <h2>Webcam stream</h2>
-            <p>Đóng tab hoặc quay lại trang chủ để dừng webcam.</p>
-        </div>
+            <div class="metrics-grid single">
+                <div class="metric-card primary">
+                    <span>Live FPS</span>
+                    <strong id="metric-live-fps">0</strong>
+                </div>
 
-        <div class="webcam-box">
-            <img
-                src="{{ url_for('webcam_feed') }}"
-                alt="Realtime Vehicle Tracking Stream"
-                id="webcam-stream"
-            >
-        </div>
+                <div class="metric-card">
+                    <span>Average FPS</span>
+                    <strong id="metric-average-fps">0</strong>
+                </div>
 
-        <div class="record-panel">
-            <div>
-                <strong>Webcam vehicle recording</strong>
-                <p id="record-status">Trạng thái: chưa ghi hình.</p>
-            </div>
+                <div class="metric-card">
+                    <span>Current Vehicles</span>
+                    <strong id="metric-current-vehicles">0</strong>
+                </div>
 
-            <div class="actions">
-                <button
-                    type="button"
-                    class="button"
-                    id="start-record-btn"
-                    data-start-url="{{ url_for('webcam_start_record') }}"
-                >
-                    Bắt đầu ghi
-                </button>
+                <div class="metric-card">
+                    <span>Total Unique IDs</span>
+                    <strong id="metric-total-ids">0</strong>
+                </div>
 
-                <button
-                    type="button"
-                    class="button secondary"
-                    id="stop-record-btn"
-                    data-stop-url="{{ url_for('webcam_stop_record') }}"
-                    disabled
-                >
-                    Dừng ghi
-                </button>
-            </div>
-        </div>
+                <div class="metric-card">
+                    <span>Max Active Vehicles</span>
+                    <strong id="metric-max-active">0</strong>
+                </div>
 
-        <div class="record-result is-hidden" id="record-result">
-            <h3>Video webcam vehicle tracking vừa ghi</h3>
+                <div class="metric-card">
+                    <span>Session Frames</span>
+                    <strong id="metric-session-frames">0</strong>
+                </div>
 
-            <video controls id="recorded-video">
-                Trình duyệt của bạn không hỗ trợ video.
-            </video>
+                <div class="metric-card">
+                    <span>Session Duration</span>
+                    <strong id="metric-duration">0s</strong>
+                </div>
 
-            <div class="actions mt-16">
-                <a href="#" class="button" id="download-record-link">
-                    Tải video webcam
-                </a>
+                <div class="metric-card">
+                    <span>Recording</span>
+                    <strong id="metric-recording">OFF</strong>
+                </div>
 
-                <a href="#" class="button light" id="open-record-link" target="_blank">
-                    Mở trong tab mới
-                </a>
+                <div class="metric-card">
+                    <span>Camera</span>
+                    <strong id="metric-camera">OFF</strong>
+                </div>
+
+                <div class="metric-card">
+                    <span>Worker</span>
+                    <strong id="metric-worker">OFF</strong>
+                </div>
             </div>
         </div>
 
-        <div class="webcam-note">
-            <div>
-                <strong>Model:</strong>
-                <span>YOLOv5n + DeepSORT</span>
-            </div>
-            <div>
-                <strong>Target:</strong>
-                <span>Car, motorcycle, bus, truck</span>
-            </div>
-            <div>
-                <strong>Device:</strong>
-                <span>CPU</span>
+        <div class="panel">
+            <h3>Recording Result</h3>
+            <div id="recording-result" class="recording-result">
+                Chưa có phiên ghi hình.
             </div>
         </div>
-    </section>
+    </aside>
+</section>
+{% endblock %}
 
-    <p class="back-row">
-        <a href="{{ url_for('index') }}" class="link">Quay lại trang chủ</a>
-    </p>
-</main>
-
+{% block scripts %}
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+{% endblock %}

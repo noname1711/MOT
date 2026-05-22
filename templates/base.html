@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Multi Vehicle Tracking{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="brand-mark">MT</span>
+                <span>
+                    <strong>MultiTracking</strong>
+                    <small>YOLOv5 + DeepSORT</small>
+                </span>
+            </a>
+
+            <nav class="nav">
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('dataset_page') }}">Dataset</a>
+                <a href="{{ url_for('upload_video') }}">Upload</a>
+                <a href="{{ url_for('webcam') }}">Webcam</a>
+                <a href="{{ url_for('results_page') }}">Results</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>Multi Vehicle Tracking System · YOLOv5 + DeepSORT · Vehicle Detection, Tracking and Evaluation</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
