@@ -6,14 +6,14 @@
 <section class="hero">
     <div class="hero-content">
         <div class="eyebrow">AI Vehicle Tracking System</div>
-        <h1>Multi Vehicle Tracking bằng YOLOv5 và DeepSORT</h1>
+        <h1>Multi Vehicle Tracking with YOLOv5 and DeepSORT</h1>
         <p>
-            Hệ thống phát hiện, theo dõi và đánh giá phương tiện giao thông trên dataset,
-            video upload và webcam realtime.
+            Detect, track, evaluate, and compare vehicles on datasets,
+            uploaded videos, and realtime webcam streams.
         </p>
 
         <div class="hero-actions">
-            <a class="btn btn-primary" href="{{ url_for('dataset_page') }}">Chạy Dataset Evaluation</a>
+            <a class="btn btn-primary" href="{{ url_for('dataset_page') }}">Run Dataset Evaluation</a>
             <a class="btn btn-secondary" href="{{ url_for('upload_video') }}">Upload Video</a>
         </div>
     </div>
@@ -27,7 +27,7 @@
 
         <div class="mini-grid">
             <div>
-                <strong>3</strong>
+                <strong>4</strong>
                 <span>Processing Modes</span>
             </div>
             <div>
@@ -48,15 +48,15 @@
 
 <section class="section">
     <div class="section-heading">
-        <h2>Chức năng chính</h2>
-        <p>Mỗi mode có cách đánh giá riêng, phù hợp với loại dữ liệu đầu vào.</p>
+        <h2>Main Features</h2>
+        <p>Each mode is designed for a different input type and evaluation workflow.</p>
     </div>
 
     <div class="cards-grid">
         <a class="feature-card" href="{{ url_for('dataset_page') }}">
             <div class="icon-box">D</div>
             <h3>Dataset Mode</h3>
-            <p>Chạy trên AICC22-Custom hoặc VNTraffic, có ground truth để đánh giá mô hình.</p>
+            <p>Run tracking on AICC22-Custom or VNTraffic with ground truth annotations.</p>
             <ul>
                 <li>Precision / Recall / F1</li>
                 <li>MOTA proxy / MOTP proxy</li>
@@ -67,10 +67,10 @@
         <a class="feature-card" href="{{ url_for('upload_video') }}">
             <div class="icon-box">U</div>
             <h3>Upload Mode</h3>
-            <p>Upload video bất kỳ và phân tích hành vi tracking khi không có ground truth.</p>
+            <p>Upload any video and analyze tracking behavior without ground truth.</p>
             <ul>
                 <li>Unique tracked vehicles</li>
-                <li>Average vehicles/frame</li>
+                <li>Average vehicles per frame</li>
                 <li>Short track ratio</li>
             </ul>
         </a>
@@ -78,7 +78,7 @@
         <a class="feature-card" href="{{ url_for('webcam') }}">
             <div class="icon-box">W</div>
             <h3>Webcam Mode</h3>
-            <p>Stream camera realtime, hiển thị tracking trực tiếp và thống kê live.</p>
+            <p>Stream a camera in realtime, display tracking results, and monitor live metrics.</p>
             <ul>
                 <li>Live FPS</li>
                 <li>Total unique IDs</li>
@@ -89,7 +89,7 @@
         <a class="feature-card" href="{{ url_for('results_page') }}">
             <div class="icon-box">R</div>
             <h3>Results</h3>
-            <p>Quản lý video, file tracking TXT và metrics JSON của các lần chạy.</p>
+            <p>Manage output videos, tracking TXT files, and metrics JSON files from each run.</p>
             <ul>
                 <li>Dataset results</li>
                 <li>Upload results</li>

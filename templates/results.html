@@ -8,8 +8,8 @@
         <div class="eyebrow">Experiment Outputs</div>
         <h1>Results</h1>
         <p>
-            Kết quả được gom theo từng lần chạy. Mỗi card gồm output video,
-            tracking TXT và metrics JSON tương ứng.
+            Results are grouped by run. Each card may include an output video,
+            a tracking TXT file, and the corresponding metrics JSON file.
         </p>
     </div>
 </section>
@@ -20,7 +20,7 @@
         <div class="mode-header">
             <div>
                 <h2>{{ mode|upper }}</h2>
-                <p>{{ runs|length }} lần chạy</p>
+                <p>{{ runs|length }} runs</p>
             </div>
         </div>
 
@@ -45,7 +45,7 @@
                             {% if run.video %}
                                 <span>{{ run.video.filename }}</span>
                             {% else %}
-                                <span class="missing">Chưa có video</span>
+                                <span class="missing">No video available</span>
                             {% endif %}
                         </div>
 
@@ -65,7 +65,7 @@
                             {% if run.txt %}
                                 <span>{{ run.txt.filename }}</span>
                             {% else %}
-                                <span class="missing">Chưa có TXT</span>
+                                <span class="missing">No TXT available</span>
                             {% endif %}
                         </div>
 
@@ -82,7 +82,7 @@
                             {% if run.metrics %}
                                 <span>{{ run.metrics.filename }}</span>
                             {% else %}
-                                <span class="missing">Chưa có metrics</span>
+                                <span class="missing">No metrics available</span>
                             {% endif %}
                         </div>
 
@@ -98,7 +98,7 @@
         </div>
         {% else %}
         <div class="panel empty-result">
-            Chưa có kết quả cho mode này.
+            No results available for this mode.
         </div>
         {% endif %}
     </div>

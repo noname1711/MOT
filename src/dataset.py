@@ -33,7 +33,7 @@ def get_dataset_info(dataset_name: str, dataset_root: str = DATASET_ROOT) -> Dic
     dataset_dir = Path(dataset_root) / dataset_name
 
     if not dataset_dir.exists():
-        raise FileNotFoundError(f"Không tìm thấy dataset: {dataset_name}")
+        raise FileNotFoundError(f"Dataset not found: {dataset_name}")
 
     original_videos = list(dataset_dir.glob("*_Original-video.mp4"))
     gt_videos = list(dataset_dir.glob("*_GroundTruth-video.mp4"))
@@ -77,12 +77,12 @@ def load_ground_truth_records(dataset_info: Dict[str, Any]) -> List[Dict[str, An
 
 def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
     """
-    Parser linh hoạt cho GroundTruth.txt.
+    Parse GroundTruth.txt files with flexible input formats.
 
-    Hỗ trợ:
-        - CSV có header: frame,id,x,y,w,h,...
-        - MOT-like không header: frame,id,x,y,w,h,...
-        - Space separated: frame id x y w h ...
+    Supported formats:
+        - CSV with header: frame,id,x,y,w,h,...
+        - MOT-like format without header: frame,id,x,y,w,h,...
+        - Space-separated values: frame id x y w h ...
     """
 
     records: List[Dict[str, Any]] = []

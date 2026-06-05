@@ -76,12 +76,13 @@ def safe_copy(src: str, dst: str) -> str:
 
 def convert_video_to_h264(input_path: str, output_path: str) -> None:
     """
-    Convert video sang H.264 để trình duyệt phát ổn định.
-    Nếu máy chưa có ffmpeg, fallback sang copy file tạm.
+    Convert a video to H.264 for stable browser playback.
+
+    If FFmpeg is not available, fall back to copying the temporary file.
     """
 
     if not os.path.exists(input_path):
-        raise FileNotFoundError(f"Không tìm thấy video cần convert: {input_path}")
+        raise FileNotFoundError(f"Video to convert not found: {input_path}")
 
     ensure_dir(os.path.dirname(output_path))
 
@@ -110,12 +111,12 @@ def get_video_info(video_path: str) -> Dict[str, Any]:
     import cv2
 
     if not os.path.exists(video_path):
-        raise FileNotFoundError(f"Không tìm thấy video: {video_path}")
+        raise FileNotFoundError(f"Video not found: {video_path}")
 
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
-        raise RuntimeError(f"Không mở được video: {video_path}")
+        raise RuntimeError(f"Cannot open video: {video_path}")
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps <= 0:
@@ -140,7 +141,9 @@ def get_video_info(video_path: str) -> Dict[str, Any]:
 
 def read_tracking_txt(tracking_txt_path: str) -> List[Dict[str, Any]]:
     """
-    Đọc file tracking format:
+    Read tracking records from a CSV-style TXT file.
+
+    Expected format:
         frame,id,x,y,w,h,conf,class,visibility
     """
 

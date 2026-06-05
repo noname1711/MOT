@@ -11,9 +11,7 @@ from src.utils import convert_video_to_h264, ensure_dir, write_tracking_header, 
 
 class VideoProcessor:
     """
-    Xử lý video file cho cả:
-        - upload mode
-        - dataset mode
+    Process video files for upload, dataset, and comparison modes.
     """
 
     def __init__(
@@ -21,13 +19,23 @@ class VideoProcessor:
         yolo_model_path: str = "models/yolov5n.pt",
         conf_threshold: float = 0.35,
         image_size: int = 416,
-        device: str = "cpu"
+        device: str = "cpu",
+        tracker_type: str = "deepsort",
+        max_age: int = 30,
+        n_init: int = 3,
+        max_cosine_distance: float = 0.4,
     ):
+        self.tracker_type = tracker_type
+
         self.pipeline = VehicleTrackingPipeline(
             yolo_model_path=yolo_model_path,
             conf_threshold=conf_threshold,
             image_size=image_size,
-            device=device
+            device=device,
+            tracker_type=tracker_type,
+            max_age=max_age,
+            n_init=n_init,
+            max_cosine_distance=max_cosine_distance,
         )
 
     def process(
@@ -38,12 +46,12 @@ class VideoProcessor:
         max_frames: int | None = None
     ) -> Dict[str, Any]:
         if not os.path.exists(input_video_path):
-            raise FileNotFoundError(f"Không tìm thấy video: {input_video_path}")
+            raise FileNotFoundError(f"Video not found: {input_video_path}")
 
         cap = cv2.VideoCapture(input_video_path)
 
         if not cap.isOpened():
-            raise RuntimeError(f"Không mở được video: {input_video_path}")
+            raise RuntimeError(f"Cannot open video: {input_video_path}")
 
         original_fps = cap.get(cv2.CAP_PROP_FPS)
         if original_fps <= 0:
@@ -69,7 +77,7 @@ class VideoProcessor:
 
         if not writer.isOpened():
             cap.release()
-            raise RuntimeError(f"Không tạo được video output: {temp_output_video_path}")
+            raise RuntimeError(f"Cannot create output video: {temp_output_video_path}")
 
         frame_id = 0
         detector_total_time = 0.0
@@ -102,7 +110,10 @@ class VideoProcessor:
                     writer.write(output_frame)
 
                     if frame_id % 20 == 0:
-                        print(f"Đã xử lý {frame_id}/{total_input_frames} frames")
+                        print(
+                            f"[{self.tracker_type}] Processed "
+                            f"{frame_id}/{total_input_frames} frames"
+                        )
 
                     if max_frames is not None and frame_id >= max_frames:
                         break
@@ -126,6 +137,7 @@ class VideoProcessor:
             "input_video_path": input_video_path,
             "output_video_path": output_video_path,
             "output_txt_path": output_txt_path,
+            "tracker_type": self.tracker_type,
             "total_frames": frame_id,
             "total_input_frames": total_input_frames,
             "elapsed_time": elapsed_time,

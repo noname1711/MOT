@@ -7,19 +7,50 @@
     <div>
         <div class="eyebrow">No Ground Truth Analysis</div>
         <h1>Upload Mode</h1>
-        <p>Upload video bất kỳ để chạy vehicle tracking và phân tích thống kê hệ thống.</p>
+        <p>Upload any video to run tracking, analyze system statistics, and compare the original DeepSORT baseline with the custom tracker.</p>
     </div>
 </section>
 
 <section class="panel">
     <form method="post" enctype="multipart/form-data" class="upload-form">
-        <div class="form-group">
-            <label>Chọn video</label>
-            <input type="file" name="video" accept=".mp4,.avi,.mov,.mkv" required>
-            <small>Hỗ trợ: MP4, AVI, MOV, MKV</small>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Select video</label>
+                <input type="file" name="video" accept=".mp4,.avi,.mov,.mkv" required>
+                <small>Supported formats: MP4, AVI, MOV, MKV</small>
+            </div>
+
+            <div class="form-group">
+                <label>Select tracker</label>
+                <select name="tracker_type" required>
+                    {% for tracker in tracker_options %}
+                        <option value="{{ tracker.value }}" {% if tracker.value == selected_tracker %}selected{% endif %}>
+                            {{ tracker.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <small>For videos without ground truth, the system focuses on FPS, ID count, and tracking behavior.</small>
+            </div>
+
+            <div class="form-group">
+                <label>Frame limit</label>
+                <input type="number" name="max_frames" min="1" placeholder="Leave empty to process all frames">
+                <small>Use this for quick tests, for example 100 frames.</small>
+            </div>
         </div>
 
-        <button class="btn btn-primary" type="submit">Analyze Video</button>
+        <div class="tracker-note">
+            {% for tracker in tracker_options %}
+                <div>
+                    <strong>{{ tracker.label }}:</strong>
+                    <span>{{ tracker.description }}</span>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Analyze Video</button>
+        </div>
     </form>
 
     {% if error %}
@@ -27,12 +58,115 @@
     {% endif %}
 </section>
 
-{% if result %}
+{% if result and result.compare %}
+<section class="section">
+    <div class="result-title">
+        <div>
+            <div class="eyebrow">Comparison Run</div>
+            <h2>{{ result.run_id }}</h2>
+            {% if result.original_filename %}
+                <p>Video: <strong>{{ result.original_filename }}</strong></p>
+            {% endif %}
+            {% if result.max_frames %}
+                <p>Limit: <strong>{{ result.max_frames }} frames</strong></p>
+            {% endif %}
+        </div>
+
+        <div class="download-group">
+            {% if result.summary_download_url %}
+                <a class="btn btn-secondary" href="{{ result.summary_download_url }}">Download Summary</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="section-heading">
+        <h2>Model Comparison</h2>
+        <p>Because uploaded videos do not include ground truth, these metrics focus on speed and tracking behavior.</p>
+    </div>
+
+    <div class="comparison-table-wrap">
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Tracker</th>
+                    <th>FPS</th>
+                    <th>Tracker Time</th>
+                    <th>Unique Tracks</th>
+                    <th>Avg Obj/Frame</th>
+                    <th>Total Frames</th>
+                    <th>Files</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in result.comparison %}
+                <tr>
+                    <td>
+                        <strong>{{ row.tracker_label }}</strong>
+                        <small>{{ row.tracker }}</small>
+                    </td>
+                    <td>{{ row.processing_fps }}</td>
+                    <td>{{ row.avg_tracker_time_ms }} ms</td>
+                    <td>{{ row.unique_tracks }}</td>
+                    <td>{{ row.avg_objects_per_frame }}</td>
+                    <td>{{ row.total_frames }}</td>
+                    <td class="file-links">
+                        {% if row.video_download_url %}<a href="{{ row.video_download_url }}">Video</a>{% endif %}
+                        {% if row.txt_download_url %}<a href="{{ row.txt_download_url }}">TXT</a>{% endif %}
+                        {% if row.metrics_download_url %}<a href="{{ row.metrics_download_url }}">Metrics</a>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section">
+    <div class="compare-video-grid">
+        {% for row in result.comparison %}
+        <div class="panel compare-video-card">
+            <div class="compare-video-header">
+                <div>
+                    <div class="eyebrow">{{ row.tracker }}</div>
+                    <h3>{{ row.tracker_label }}</h3>
+                </div>
+                <span class="badge">{{ row.processing_fps }} FPS</span>
+            </div>
+
+            {% if row.video_url %}
+            <div class="video-panel">
+                <video controls>
+                    <source src="{{ row.video_url }}" type="video/mp4">
+                </video>
+            </div>
+            {% endif %}
+
+            <div class="mini-metrics">
+                <div><span>Tracker time</span><strong>{{ row.avg_tracker_time_ms }} ms</strong></div>
+                <div><span>Unique tracks</span><strong>{{ row.unique_tracks }}</strong></div>
+                <div><span>Avg objects/frame</span><strong>{{ row.avg_objects_per_frame }}</strong></div>
+                <div><span>Total frames</span><strong>{{ row.total_frames }}</strong></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section">
+    <details class="raw-json">
+        <summary>View full comparison summary JSON</summary>
+        <pre>{{ result.summary | tojson(indent=2) }}</pre>
+    </details>
+</section>
+{% endif %}
+
+{% if result and not result.compare %}
 <section class="section">
     <div class="result-title">
         <div>
             <div class="eyebrow">Run ID</div>
             <h2>{{ result.run_id }}</h2>
+            <p>Tracker: <strong>{{ result.tracker_label }}</strong></p>
         </div>
 
         <div class="download-group">
@@ -52,44 +186,44 @@
 <section class="section">
     <div class="section-heading">
         <h2>Vehicle Statistics</h2>
-        <p>Vì video upload không có ground truth, các chỉ số dưới đây là thống kê tracking và proxy metrics.</p>
+        <p>Because uploaded videos do not include ground truth, these values describe tracking behavior and proxy statistics.</p>
     </div>
 
     <div class="metrics-grid">
         <div class="metric-card primary">
             <span>Unique Vehicles</span>
             <strong>{{ result.metrics.vehicle_statistics.unique_tracked_vehicles }}</strong>
-            <small>Số ID vehicle khác nhau</small>
+            <small>Number of unique vehicle IDs</small>
         </div>
 
         <div class="metric-card primary">
             <span>Total Tracking Rows</span>
             <strong>{{ result.metrics.vehicle_statistics.total_tracking_rows }}</strong>
-            <small>Tổng dòng tracking</small>
+            <small>Total rows written to the tracking file</small>
         </div>
 
         <div class="metric-card primary">
             <span>Avg Vehicles/Frame</span>
             <strong>{{ result.metrics.vehicle_statistics.avg_vehicles_per_frame }}</strong>
-            <small>Mật độ trung bình</small>
+            <small>Average vehicle density per frame</small>
         </div>
 
         <div class="metric-card">
             <span>Max Vehicles/Frame</span>
             <strong>{{ result.metrics.vehicle_statistics.max_vehicles_per_frame }}</strong>
-            <small>Frame đông nhất</small>
+            <small>Highest number of vehicles in one frame</small>
         </div>
 
         <div class="metric-card">
             <span>Visible Rows</span>
             <strong>{{ result.metrics.vehicle_statistics.total_visible_rows }}</strong>
-            <small>Track khớp YOLO detection</small>
+            <small>Tracks matched with YOLO detections</small>
         </div>
 
         <div class="metric-card">
             <span>Short Track Ratio</span>
             <strong>{{ result.metrics.tracking_behavior.short_track_ratio }}</strong>
-            <small>Tỷ lệ track ngắn</small>
+            <small>Ratio of short-lived tracks</small>
         </div>
     </div>
 </section>
@@ -141,7 +275,7 @@
 
 <section class="section">
     <details class="raw-json">
-        <summary>Xem toàn bộ metrics JSON</summary>
+        <summary>View full metrics JSON</summary>
         <pre>{{ result.metrics | tojson(indent=2) }}</pre>
     </details>
 </section>

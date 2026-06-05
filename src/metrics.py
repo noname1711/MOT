@@ -160,10 +160,11 @@ def evaluate_with_ground_truth(
     iou_threshold: float = 0.5
 ) -> Dict[str, Any]:
     """
-    Evaluation đơn giản, đủ dùng cho đồ án:
-        - Greedy IoU matching theo từng frame
-        - Precision / Recall / F1
-        - FP / FN
+    Compute lightweight tracking metrics for project-level evaluation.
+
+    The evaluation uses greedy IoU matching per frame and reports:
+        - Precision, Recall, and F1-score
+        - False positives and false negatives
         - MOTP proxy
         - ID switch proxy
         - MOTA proxy

@@ -2,10 +2,15 @@ from typing import Any, Dict, List, Optional
 
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
+from src.custom_deepsort import CustomDeepSORTTracker
+
 
 class DeepSORTTracker:
     """
-    Wrapper DeepSORT dùng để gán ID cho detections từ YOLO.
+    Wrapper around the original deep-sort-realtime tracker.
+
+    This tracker is kept as the baseline for comparison with the custom
+    DeepSORT implementation.
     """
 
     def __init__(
@@ -153,3 +158,44 @@ class DeepSORTTracker:
             return 0.0
 
         return inter_area / union_area
+
+
+def create_tracker(
+    tracker_type: str = "deepsort",
+    max_age: int = 30,
+    n_init: int = 3,
+    max_cosine_distance: float = 0.4,
+    nn_budget=None,
+):
+    """
+    Create a tracker instance from a tracker type string.
+
+    Supported values:
+        - "deepsort": original deep-sort-realtime baseline.
+        - "custom": optimized custom DeepSORT implementation.
+        - "custom_deepsort": alias for the custom tracker.
+    """
+
+    normalized = str(tracker_type).strip().lower()
+
+    if normalized in {"deepsort", "deep_sort", "original", "baseline"}:
+        return DeepSORTTracker(
+            max_age=max_age,
+            n_init=n_init,
+            max_cosine_distance=max_cosine_distance,
+            nn_budget=nn_budget,
+        )
+
+    if normalized in {"custom", "custom_deepsort", "custom-deepsort"}:
+        return CustomDeepSORTTracker(
+            max_age=25,
+            n_init=2,
+            max_cosine_distance=0.50,
+            max_iou_distance=0.72,
+            nn_budget=nn_budget,
+        )
+
+    raise ValueError(
+        f"Invalid tracker_type: {tracker_type}. "
+        f"Supported values: deepsort, custom."
+    )

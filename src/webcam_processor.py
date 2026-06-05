@@ -20,12 +20,10 @@ from src.visualizer import draw_hud
 
 class WebcamProcessor:
     """
-    WebcamProcessor chạy bằng background thread.
+    Background-thread webcam processor.
 
-    Lý do cần background thread:
-        - /webcam_feed chỉ nên stream frame mới nhất cho trình duyệt.
-        - Việc đọc webcam, chạy YOLO + DeepSORT, cập nhật metrics và record video
-          phải chạy độc lập, không phụ thuộc vào browser có đang đọc stream hay không.
+    The worker thread keeps camera capture, YOLO inference, tracking, metrics,
+    and optional recording independent from the browser stream consumer.
     """
 
     def __init__(
@@ -35,14 +33,17 @@ class WebcamProcessor:
         conf_threshold: float = 0.35,
         image_size: int = 416,
         device: str = "cpu",
+        tracker_type: str = "deepsort",
     ):
         self.camera_index = camera_index
+        self.tracker_type = tracker_type
 
         self.pipeline = VehicleTrackingPipeline(
             yolo_model_path=yolo_model_path,
             conf_threshold=conf_threshold,
             image_size=image_size,
             device=device,
+            tracker_type=tracker_type,
         )
 
         self.cap = None
@@ -85,14 +86,14 @@ class WebcamProcessor:
 
     def start(self) -> Dict[str, Any]:
         """
-        Khởi động background worker nếu chưa chạy.
+        Start the background worker if it is not already running.
         """
 
         with self.lock:
             if self.running:
                 return {
                     "success": True,
-                    "message": "Webcam worker đang chạy.",
+                    "message": "Webcam worker is already running.",
                 }
 
             self.running = True
@@ -116,12 +117,12 @@ class WebcamProcessor:
 
         return {
             "success": True,
-            "message": "Đã khởi động webcam worker.",
+            "message": "Webcam worker started.",
         }
 
     def stop(self) -> Dict[str, Any]:
         """
-        Dừng background worker và giải phóng webcam.
+        Stop the background worker and release the webcam.
         """
 
         with self.lock:
@@ -139,7 +140,7 @@ class WebcamProcessor:
 
         return {
             "success": True,
-            "message": "Đã dừng webcam worker.",
+            "message": "Webcam worker stopped.",
         }
 
     def _open_camera(self) -> None:
@@ -149,7 +150,7 @@ class WebcamProcessor:
         self.cap = cv2.VideoCapture(self.camera_index)
 
         if not self.cap.isOpened():
-            raise RuntimeError(f"Không mở được webcam index {self.camera_index}")
+            raise RuntimeError(f"Cannot open webcam index {self.camera_index}")
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -171,9 +172,9 @@ class WebcamProcessor:
         fps: float = 20.0,
     ) -> Dict[str, Any]:
         """
-        Bắt đầu ghi video webcam.
+        Start webcam recording.
 
-        Hàm này tự khởi động worker nếu worker chưa chạy.
+        The worker is started automatically if it is not already running.
         """
 
         self.start()
@@ -182,7 +183,7 @@ class WebcamProcessor:
             if self.is_recording:
                 return {
                     "success": False,
-                    "message": "Webcam đang ghi hình.",
+                    "message": "Webcam is already recording.",
                 }
 
             ensure_dir(os.path.dirname(static_output_path))
@@ -211,7 +212,7 @@ class WebcamProcessor:
 
         return {
             "success": True,
-            "message": "Đã bắt đầu ghi webcam.",
+            "message": "Webcam recording started.",
             "static_output_path": static_output_path,
             "result_output_path": result_output_path,
             "txt_output_path": txt_output_path,
@@ -219,7 +220,7 @@ class WebcamProcessor:
 
     def stop_recording(self) -> Dict[str, Any]:
         """
-        Dừng ghi webcam, convert video sang H.264, copy sang results và trả metrics phiên record.
+        Stop webcam recording, convert the video, and return recording metrics.
         """
 
         with self.lock:
@@ -229,7 +230,7 @@ class WebcamProcessor:
         if not self.is_recording:
             return {
                 "success": False,
-                "message": "Webcam hiện không ghi hình.",
+                "message": "Webcam is not recording.",
             }
 
         self.is_recording = False
@@ -248,7 +249,7 @@ class WebcamProcessor:
             self._clear_recording_state()
             return {
                 "success": False,
-                "message": "Chưa có frame nào được ghi. Hãy chờ webcam hiển thị vài giây rồi bấm Stop.",
+                "message": "No frames were recorded. Wait a few seconds after the webcam appears, then press Stop.",
             }
 
         if self.record_frame_count <= 0:
@@ -258,7 +259,7 @@ class WebcamProcessor:
             self._clear_recording_state()
             return {
                 "success": False,
-                "message": "Video ghi hình không có frame nào.",
+                "message": "The recorded video does not contain any frames.",
             }
 
         convert_video_to_h264(
@@ -277,7 +278,8 @@ class WebcamProcessor:
 
         result = {
             "success": True,
-            "message": "Đã dừng ghi webcam.",
+            "message": "Webcam recording stopped.",
+            "tracker_type": self.tracker_type,
             "frame_count": self.record_frame_count,
             "duration_sec": round(duration, 4),
             "fps": round(avg_fps, 4),
@@ -319,7 +321,7 @@ class WebcamProcessor:
 
             if not self.record_writer.isOpened():
                 self.is_recording = False
-                self.latest_error = f"Không tạo được file ghi webcam: {self.record_temp_path}"
+                self.latest_error = f"Cannot create webcam recording file: {self.record_temp_path}"
                 raise RuntimeError(self.latest_error)
 
         self.record_frame_count += 1
@@ -351,6 +353,7 @@ class WebcamProcessor:
 
             return {
                 "worker_running": self.running,
+                "tracker_type": self.tracker_type,
                 "camera_opened": self.cap is not None and self.cap.isOpened(),
                 "session_duration_sec": round(duration, 2),
                 "session_frames": self.session_frame_count,
@@ -366,9 +369,10 @@ class WebcamProcessor:
 
     def generate_frames(self):
         """
-        Route /webcam_feed gọi hàm này.
+        Yield MJPEG frames for the /webcam_feed route.
 
-        Hàm này không xử lý YOLO trực tiếp nữa, chỉ lấy latest JPEG từ worker.
+        YOLO and tracking are handled by the worker thread; this generator only
+        streams the latest encoded JPEG frame.
         """
 
         self.start()
@@ -410,7 +414,7 @@ class WebcamProcessor:
 
                 if not ret:
                     with self.lock:
-                        self.latest_error = "Không đọc được frame từ webcam."
+                        self.latest_error = "Cannot read frames from the webcam."
                     time.sleep(0.05)
                     continue
 
@@ -442,6 +446,7 @@ class WebcamProcessor:
                     )
 
                     hud = {
+                        "Tracker": self.tracker_type,
                         "FPS": f"{self.last_fps:.1f}",
                         "Current Vehicles": self.current_active_tracks,
                         "Total IDs": len(self.session_track_ids),

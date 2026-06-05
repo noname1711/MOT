@@ -32,6 +32,7 @@ from src.utils import (
 )
 from src.video_processor import VideoProcessor
 from src.webcam_processor import WebcamProcessor
+from src.compare import compare_dataset_trackers, compare_upload_trackers
 
 
 app = Flask(__name__)
@@ -45,9 +46,33 @@ CONF_THRESHOLD = 0.35
 IMAGE_SIZE = 416
 DEVICE = "cpu"
 
-VEHICLE_MODEL_NAME = "YOLOv5n + DeepSORT Vehicle Tracking"
+VEHICLE_MODEL_NAME = "YOLOv5n + DeepSORT/Custom DeepSORT Vehicle Tracking"
 
-MODES = ["dataset", "upload", "webcam"]
+TRACKER_OPTIONS = [
+    {
+        "value": "deepsort",
+        "label": "Original DeepSORT",
+        "description": "Baseline tracker using the deep-sort-realtime library and a MobileNet embedder."
+    },
+    {
+        "value": "custom",
+        "label": "Custom DeepSORT",
+        "description": "Custom tracker implemented with Kalman Filter, IoU Matching, Appearance Matching, Hungarian Assignment, and Track Lifecycle."
+    },
+    {
+        "value": "compare",
+        "label": "Compare both",
+        "description": "Run the original DeepSORT and Custom DeepSORT on the same video for comparison."
+    },
+]
+
+DEFAULT_WEBCAM_TRACKER = "deepsort"
+WEBCAM_TRACKER_OPTIONS = [
+    item for item in TRACKER_OPTIONS
+    if item["value"] in {"deepsort", "custom"}
+]
+
+MODES = ["dataset", "upload", "webcam", "compare"]
 
 webcam_processor = None
 
@@ -58,6 +83,8 @@ latest_webcam_recording = {
     "static_path": None,
     "result_path": None,
     "txt_path": None,
+    "tracker_type": DEFAULT_WEBCAM_TRACKER,
+    "tracker_label": "Original DeepSORT",
 }
 
 
@@ -71,8 +98,44 @@ def init_directories():
         ensure_dir(os.path.join(RESULT_ROOT, mode, "metrics"))
 
 
-def get_webcam_processor() -> WebcamProcessor:
+def normalize_webcam_tracker(tracker_type: str | None = None) -> str:
+    normalized = str(tracker_type or DEFAULT_WEBCAM_TRACKER).strip().lower()
+
+    if normalized in {"custom", "custom_deepsort", "custom-deepsort"}:
+        return "custom"
+
+    return "deepsort"
+
+
+def get_current_webcam_tracker_type() -> str:
+    if webcam_processor is None:
+        return DEFAULT_WEBCAM_TRACKER
+
+    return normalize_webcam_tracker(
+        getattr(webcam_processor, "tracker_type", DEFAULT_WEBCAM_TRACKER)
+    )
+
+
+def get_webcam_processor(tracker_type: str | None = None) -> WebcamProcessor:
     global webcam_processor
+
+    selected_tracker = normalize_webcam_tracker(
+        tracker_type or get_current_webcam_tracker_type()
+    )
+
+    if webcam_processor is not None:
+        current_tracker = normalize_webcam_tracker(
+            getattr(webcam_processor, "tracker_type", DEFAULT_WEBCAM_TRACKER)
+        )
+
+        if current_tracker != selected_tracker:
+            live_info = webcam_processor.get_live_metrics()
+
+            if not live_info.get("is_recording"):
+                webcam_processor.stop()
+                webcam_processor = None
+            else:
+                selected_tracker = current_tracker
 
     if webcam_processor is None:
         webcam_processor = WebcamProcessor(
@@ -81,35 +144,135 @@ def get_webcam_processor() -> WebcamProcessor:
             conf_threshold=CONF_THRESHOLD,
             image_size=IMAGE_SIZE,
             device=DEVICE,
+            tracker_type=selected_tracker,
         )
 
     return webcam_processor
 
 
-def create_video_processor() -> VideoProcessor:
+def create_video_processor(tracker_type: str = "deepsort") -> VideoProcessor:
     return VideoProcessor(
         yolo_model_path=MODEL_PATH,
         conf_threshold=CONF_THRESHOLD,
         image_size=IMAGE_SIZE,
         device=DEVICE,
+        tracker_type=tracker_type,
     )
 
 
 def get_result_dir(mode: str, kind: str) -> str:
     if mode not in MODES:
-        raise ValueError(f"Mode không hợp lệ: {mode}")
+        raise ValueError(f"Invalid mode: {mode}")
 
     if kind not in {"videos", "txt", "metrics"}:
-        raise ValueError(f"Kind không hợp lệ: {kind}")
+        raise ValueError(f"Invalid result kind: {kind}")
 
     return os.path.join(RESULT_ROOT, mode, kind)
 
 
 def get_static_output_dir(mode: str) -> str:
     if mode not in MODES:
-        raise ValueError(f"Mode không hợp lệ: {mode}")
+        raise ValueError(f"Invalid mode: {mode}")
 
     return os.path.join(STATIC_OUTPUT_ROOT, mode)
+
+
+def get_tracker_label(tracker_type: str) -> str:
+    tracker_type = str(tracker_type).strip().lower()
+
+    for item in TRACKER_OPTIONS:
+        if item["value"] == tracker_type:
+            return item["label"]
+
+    return tracker_type
+
+
+def get_selected_tracker(default: str = "deepsort") -> str:
+    tracker_type = request.form.get("tracker_type", default).strip().lower()
+
+    valid_values = {item["value"] for item in TRACKER_OPTIONS}
+
+    if tracker_type not in valid_values:
+        return default
+
+    return tracker_type
+
+
+def get_optional_max_frames():
+    raw_value = request.form.get("max_frames", "").strip()
+
+    if not raw_value:
+        return None
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return None
+
+    if value <= 0:
+        return None
+
+    return value
+
+
+def build_compare_template_result(summary: dict) -> dict:
+    rows = []
+
+    for row in summary.get("comparison", []):
+        item = dict(row)
+
+        video_name = os.path.basename(str(row.get("video_path", "")))
+        txt_name = os.path.basename(str(row.get("txt_path", "")))
+        metrics_name = os.path.basename(str(row.get("metrics_path", "")))
+
+        item.update({
+            "video_name": video_name,
+            "txt_name": txt_name,
+            "metrics_name": metrics_name,
+            "video_url": url_for(
+                "static",
+                filename=f"outputs/compare/{video_name}",
+            ) if video_name else None,
+            "video_download_url": url_for(
+                "download_file",
+                mode="compare",
+                kind="videos",
+                filename=video_name,
+            ) if video_name else None,
+            "txt_download_url": url_for(
+                "download_file",
+                mode="compare",
+                kind="txt",
+                filename=txt_name,
+            ) if txt_name else None,
+            "metrics_download_url": url_for(
+                "download_file",
+                mode="compare",
+                kind="metrics",
+                filename=metrics_name,
+            ) if metrics_name else None,
+        })
+
+        rows.append(item)
+
+    summary_path = summary.get("summary_path")
+    summary_name = os.path.basename(summary_path) if summary_path else None
+
+    return {
+        "compare": True,
+        "run_id": summary.get("run_id"),
+        "run_name": summary.get("run_name"),
+        "input_video_path": summary.get("input_video_path"),
+        "max_frames": summary.get("max_frames"),
+        "comparison": rows,
+        "summary": summary,
+        "summary_download_url": url_for(
+            "download_file",
+            mode="compare",
+            kind="metrics",
+            filename=summary_name,
+        ) if summary_name else None,
+    }
 
 
 @app.route("/")
@@ -126,124 +289,161 @@ def dataset_page():
     datasets = list_datasets()
     result = None
     error = None
+    selected_tracker = "deepsort"
 
     if request.method == "POST":
         dataset_name = request.form.get("dataset_name", "").strip()
+        selected_tracker = get_selected_tracker()
+        max_frames = get_optional_max_frames()
 
         if not dataset_name:
-            error = "Bạn chưa chọn dataset."
+            error = "No dataset was selected."
             return render_template(
                 "dataset.html",
                 datasets=datasets,
                 result=result,
                 error=error,
+                tracker_options=TRACKER_OPTIONS,
+                selected_tracker=selected_tracker,
             )
 
         try:
-            dataset_info = get_dataset_info(dataset_name)
-            input_video_path = dataset_info.get("original_video_path")
-
-            if not input_video_path:
-                raise FileNotFoundError(
-                    f"Dataset {dataset_name} không có Original-video.mp4"
+            if selected_tracker == "compare":
+                summary = compare_dataset_trackers(
+                    dataset_name=dataset_name,
+                    yolo_model_path=MODEL_PATH,
+                    conf_threshold=CONF_THRESHOLD,
+                    image_size=IMAGE_SIZE,
+                    device=DEVICE,
+                    max_frames=max_frames,
                 )
 
-            run_id = f"{timestamp_now()}_{dataset_name}"
-            output_video_name = f"{run_id}_tracking.mp4"
-            output_txt_name = f"{run_id}_tracking.txt"
+                result = build_compare_template_result(summary)
+                result.update({
+                    "dataset_name": dataset_name,
+                    "mode": "dataset",
+                })
 
-            static_output_video_path = os.path.join(
-                get_static_output_dir("dataset"),
-                output_video_name,
-            )
+            else:
+                dataset_info = get_dataset_info(dataset_name)
+                input_video_path = dataset_info.get("original_video_path")
 
-            result_video_path = os.path.join(
-                get_result_dir("dataset", "videos"),
-                output_video_name,
-            )
+                if not input_video_path:
+                    raise FileNotFoundError(
+                        f"Dataset {dataset_name} does not contain Original-video.mp4"
+                    )
 
-            result_txt_path = os.path.join(
-                get_result_dir("dataset", "txt"),
-                output_txt_name,
-            )
+                run_id = f"{timestamp_now()}_{dataset_name}_{selected_tracker}"
+                output_video_name = f"{run_id}_tracking.mp4"
+                output_txt_name = f"{run_id}_tracking.txt"
 
-            processor = create_video_processor()
+                static_output_video_path = os.path.join(
+                    get_static_output_dir("dataset"),
+                    output_video_name,
+                )
 
-            process_info = processor.process(
-                input_video_path=input_video_path,
-                output_video_path=static_output_video_path,
-                output_txt_path=result_txt_path,
-            )
+                result_video_path = os.path.join(
+                    get_result_dir("dataset", "videos"),
+                    output_video_name,
+                )
 
-            shutil.copyfile(static_output_video_path, result_video_path)
+                result_txt_path = os.path.join(
+                    get_result_dir("dataset", "txt"),
+                    output_txt_name,
+                )
 
-            ground_truth_records = load_ground_truth_records(dataset_info)
-            groundtruth_summary = summarize_ground_truth(ground_truth_records)
+                processor = create_video_processor(tracker_type=selected_tracker)
 
-            metrics_data = build_dataset_metrics(
-                dataset_name=dataset_name,
-                ground_truth_records=ground_truth_records,
-                prediction_txt_path=result_txt_path,
-                process_info=process_info,
-                groundtruth_summary=groundtruth_summary,
-            )
+                process_info = processor.process(
+                    input_video_path=input_video_path,
+                    output_video_path=static_output_video_path,
+                    output_txt_path=result_txt_path,
+                    max_frames=max_frames,
+                )
 
-            metrics_data.update({
-                "run_id": run_id,
-                "model": VEHICLE_MODEL_NAME,
-                "yolo_model_path": MODEL_PATH,
-                "tracker": "DeepSORT",
-                "device": DEVICE,
-                "confidence_threshold": CONF_THRESHOLD,
-                "image_size": IMAGE_SIZE,
-                "input_video_path": input_video_path,
-                "output_video_path": result_video_path,
-                "web_output_video_path": static_output_video_path,
-                "tracking_txt_path": result_txt_path,
-            })
+                shutil.copyfile(static_output_video_path, result_video_path)
 
-            metrics_path = save_metrics(
-                metrics=metrics_data,
-                output_dir=get_result_dir("dataset", "metrics"),
-                run_id=run_id,
-            )
+                ground_truth_records = load_ground_truth_records(dataset_info)
 
-            result = {
-                "run_id": run_id,
-                "dataset_name": dataset_name,
-                "video_url": url_for(
-                    "static",
-                    filename=f"outputs/dataset/{output_video_name}",
-                ),
-                "video_download_url": url_for(
-                    "download_file",
-                    mode="dataset",
-                    kind="videos",
-                    filename=output_video_name,
-                ),
-                "txt_download_url": url_for(
-                    "download_file",
-                    mode="dataset",
-                    kind="txt",
-                    filename=output_txt_name,
-                ),
-                "metrics_download_url": url_for(
-                    "download_file",
-                    mode="dataset",
-                    kind="metrics",
-                    filename=os.path.basename(metrics_path),
-                ),
-                "metrics": metrics_data,
-            }
+                if max_frames is not None:
+                    ground_truth_records = [
+                        item for item in ground_truth_records
+                        if int(item["frame"]) <= int(max_frames)
+                    ]
+
+                groundtruth_summary = summarize_ground_truth(ground_truth_records)
+
+                metrics_data = build_dataset_metrics(
+                    dataset_name=dataset_name,
+                    ground_truth_records=ground_truth_records,
+                    prediction_txt_path=result_txt_path,
+                    process_info=process_info,
+                    groundtruth_summary=groundtruth_summary,
+                )
+
+                metrics_data.update({
+                    "run_id": run_id,
+                    "model": f"YOLOv5n + {get_tracker_label(selected_tracker)} Vehicle Tracking",
+                    "yolo_model_path": MODEL_PATH,
+                    "tracker": selected_tracker,
+                    "tracker_label": get_tracker_label(selected_tracker),
+                    "device": DEVICE,
+                    "confidence_threshold": CONF_THRESHOLD,
+                    "image_size": IMAGE_SIZE,
+                    "max_frames": max_frames,
+                    "input_video_path": input_video_path,
+                    "output_video_path": result_video_path,
+                    "web_output_video_path": static_output_video_path,
+                    "tracking_txt_path": result_txt_path,
+                })
+
+                metrics_path = save_metrics(
+                    metrics=metrics_data,
+                    output_dir=get_result_dir("dataset", "metrics"),
+                    run_id=run_id,
+                )
+
+                result = {
+                    "compare": False,
+                    "run_id": run_id,
+                    "dataset_name": dataset_name,
+                    "tracker": selected_tracker,
+                    "tracker_label": get_tracker_label(selected_tracker),
+                    "video_url": url_for(
+                        "static",
+                        filename=f"outputs/dataset/{output_video_name}",
+                    ),
+                    "video_download_url": url_for(
+                        "download_file",
+                        mode="dataset",
+                        kind="videos",
+                        filename=output_video_name,
+                    ),
+                    "txt_download_url": url_for(
+                        "download_file",
+                        mode="dataset",
+                        kind="txt",
+                        filename=output_txt_name,
+                    ),
+                    "metrics_download_url": url_for(
+                        "download_file",
+                        mode="dataset",
+                        kind="metrics",
+                        filename=os.path.basename(metrics_path),
+                    ),
+                    "metrics": metrics_data,
+                }
 
         except Exception as e:
-            error = f"Lỗi khi xử lý dataset: {str(e)}"
+            error = f"Error while processing dataset: {str(e)}"
 
     return render_template(
         "dataset.html",
         datasets=datasets,
         result=result,
         error=error,
+        tracker_options=TRACKER_OPTIONS,
+        selected_tracker=selected_tracker,
     )
 
 
@@ -255,21 +455,43 @@ def dataset_page():
 def upload_video():
     result = None
     error = None
+    selected_tracker = "deepsort"
 
     if request.method == "POST":
+        selected_tracker = get_selected_tracker()
+        max_frames = get_optional_max_frames()
+
         if "video" not in request.files:
-            error = "Không tìm thấy file video trong request."
-            return render_template("upload.html", result=result, error=error)
+            error = "No video file was found in the request."
+            return render_template(
+                "upload.html",
+                result=result,
+                error=error,
+                tracker_options=TRACKER_OPTIONS,
+                selected_tracker=selected_tracker,
+            )
 
         file = request.files["video"]
 
         if file.filename == "":
-            error = "Bạn chưa chọn video."
-            return render_template("upload.html", result=result, error=error)
+            error = "No video was selected."
+            return render_template(
+                "upload.html",
+                result=result,
+                error=error,
+                tracker_options=TRACKER_OPTIONS,
+                selected_tracker=selected_tracker,
+            )
 
         if not allowed_video_file(file.filename):
-            error = "Định dạng video không hợp lệ. Chỉ hỗ trợ: mp4, avi, mov, mkv."
-            return render_template("upload.html", result=result, error=error)
+            error = "Invalid video format. Supported formats: mp4, avi, mov, mkv."
+            return render_template(
+                "upload.html",
+                result=result,
+                error=error,
+                tracker_options=TRACKER_OPTIONS,
+                selected_tracker=selected_tracker,
+            )
 
         try:
             original_filename = secure_filename(file.filename)
@@ -279,90 +501,121 @@ def upload_video():
             input_path = os.path.join(UPLOAD_FOLDER, input_filename)
             file.save(input_path)
 
-            output_video_name = f"{run_id}_tracking.mp4"
-            output_txt_name = f"{run_id}_tracking.txt"
+            if selected_tracker == "compare":
+                summary = compare_upload_trackers(
+                    input_video_path=input_path,
+                    run_name=Path(original_filename).stem,
+                    yolo_model_path=MODEL_PATH,
+                    conf_threshold=CONF_THRESHOLD,
+                    image_size=IMAGE_SIZE,
+                    device=DEVICE,
+                    max_frames=max_frames,
+                )
 
-            static_output_video_path = os.path.join(
-                get_static_output_dir("upload"),
-                output_video_name,
-            )
+                result = build_compare_template_result(summary)
+                result.update({
+                    "mode": "upload",
+                    "original_filename": original_filename,
+                })
 
-            result_video_path = os.path.join(
-                get_result_dir("upload", "videos"),
-                output_video_name,
-            )
+            else:
+                run_id = f"{run_id}_{selected_tracker}"
+                output_video_name = f"{run_id}_tracking.mp4"
+                output_txt_name = f"{run_id}_tracking.txt"
 
-            result_txt_path = os.path.join(
-                get_result_dir("upload", "txt"),
-                output_txt_name,
-            )
+                static_output_video_path = os.path.join(
+                    get_static_output_dir("upload"),
+                    output_video_name,
+                )
 
-            processor = create_video_processor()
+                result_video_path = os.path.join(
+                    get_result_dir("upload", "videos"),
+                    output_video_name,
+                )
 
-            process_info = processor.process(
-                input_video_path=input_path,
-                output_video_path=static_output_video_path,
-                output_txt_path=result_txt_path,
-            )
+                result_txt_path = os.path.join(
+                    get_result_dir("upload", "txt"),
+                    output_txt_name,
+                )
 
-            shutil.copyfile(static_output_video_path, result_video_path)
+                processor = create_video_processor(tracker_type=selected_tracker)
 
-            metrics_data = build_upload_metrics(
-                tracking_txt_path=result_txt_path,
-                process_info=process_info,
-            )
+                process_info = processor.process(
+                    input_video_path=input_path,
+                    output_video_path=static_output_video_path,
+                    output_txt_path=result_txt_path,
+                    max_frames=max_frames,
+                )
 
-            metrics_data.update({
-                "run_id": run_id,
-                "model": VEHICLE_MODEL_NAME,
-                "yolo_model_path": MODEL_PATH,
-                "tracker": "DeepSORT",
-                "device": DEVICE,
-                "confidence_threshold": CONF_THRESHOLD,
-                "image_size": IMAGE_SIZE,
-                "input_video_path": input_path,
-                "output_video_path": result_video_path,
-                "web_output_video_path": static_output_video_path,
-                "tracking_txt_path": result_txt_path,
-            })
+                shutil.copyfile(static_output_video_path, result_video_path)
 
-            metrics_path = save_metrics(
-                metrics=metrics_data,
-                output_dir=get_result_dir("upload", "metrics"),
-                run_id=run_id,
-            )
+                metrics_data = build_upload_metrics(
+                    tracking_txt_path=result_txt_path,
+                    process_info=process_info,
+                )
 
-            result = {
-                "run_id": run_id,
-                "video_url": url_for(
-                    "static",
-                    filename=f"outputs/upload/{output_video_name}",
-                ),
-                "video_download_url": url_for(
-                    "download_file",
-                    mode="upload",
-                    kind="videos",
-                    filename=output_video_name,
-                ),
-                "txt_download_url": url_for(
-                    "download_file",
-                    mode="upload",
-                    kind="txt",
-                    filename=output_txt_name,
-                ),
-                "metrics_download_url": url_for(
-                    "download_file",
-                    mode="upload",
-                    kind="metrics",
-                    filename=os.path.basename(metrics_path),
-                ),
-                "metrics": metrics_data,
-            }
+                metrics_data.update({
+                    "run_id": run_id,
+                    "model": f"YOLOv5n + {get_tracker_label(selected_tracker)} Vehicle Tracking",
+                    "yolo_model_path": MODEL_PATH,
+                    "tracker": selected_tracker,
+                    "tracker_label": get_tracker_label(selected_tracker),
+                    "device": DEVICE,
+                    "confidence_threshold": CONF_THRESHOLD,
+                    "image_size": IMAGE_SIZE,
+                    "max_frames": max_frames,
+                    "input_video_path": input_path,
+                    "output_video_path": result_video_path,
+                    "web_output_video_path": static_output_video_path,
+                    "tracking_txt_path": result_txt_path,
+                })
+
+                metrics_path = save_metrics(
+                    metrics=metrics_data,
+                    output_dir=get_result_dir("upload", "metrics"),
+                    run_id=run_id,
+                )
+
+                result = {
+                    "compare": False,
+                    "run_id": run_id,
+                    "tracker": selected_tracker,
+                    "tracker_label": get_tracker_label(selected_tracker),
+                    "video_url": url_for(
+                        "static",
+                        filename=f"outputs/upload/{output_video_name}",
+                    ),
+                    "video_download_url": url_for(
+                        "download_file",
+                        mode="upload",
+                        kind="videos",
+                        filename=output_video_name,
+                    ),
+                    "txt_download_url": url_for(
+                        "download_file",
+                        mode="upload",
+                        kind="txt",
+                        filename=output_txt_name,
+                    ),
+                    "metrics_download_url": url_for(
+                        "download_file",
+                        mode="upload",
+                        kind="metrics",
+                        filename=os.path.basename(metrics_path),
+                    ),
+                    "metrics": metrics_data,
+                }
 
         except Exception as e:
-            error = f"Lỗi khi xử lý video: {str(e)}"
+            error = f"Error while processing video: {str(e)}"
 
-    return render_template("upload.html", result=result, error=error)
+    return render_template(
+        "upload.html",
+        result=result,
+        error=error,
+        tracker_options=TRACKER_OPTIONS,
+        selected_tracker=selected_tracker,
+    )
 
 
 # ============================================================
@@ -371,9 +624,19 @@ def upload_video():
 
 @app.route("/webcam")
 def webcam():
-    processor = get_webcam_processor()
+    selected_tracker = normalize_webcam_tracker(
+        request.args.get("tracker_type", get_current_webcam_tracker_type())
+    )
+
+    processor = get_webcam_processor(tracker_type=selected_tracker)
     processor.start()
-    return render_template("webcam.html")
+
+    return render_template(
+        "webcam.html",
+        tracker_options=WEBCAM_TRACKER_OPTIONS,
+        selected_tracker=selected_tracker,
+        selected_tracker_label=get_tracker_label(selected_tracker),
+    )
 
 
 @app.route("/webcam_feed")
@@ -395,19 +658,34 @@ def webcam_metrics():
 @app.route("/webcam/start_worker", methods=["POST"])
 def webcam_start_worker():
     """
-    Route ẩn để frontend tự bật webcam worker khi quay lại trang webcam.
-    Không hiển thị nút này trên giao diện.
+    Internal route used by the frontend to restart the webcam worker.
+
+    This endpoint is not exposed as a visible UI button.
     """
 
-    processor = get_webcam_processor()
-    return jsonify(processor.start())
+    payload = request.get_json(silent=True) or {}
+    selected_tracker = normalize_webcam_tracker(
+        payload.get("tracker_type")
+        or request.form.get("tracker_type")
+        or request.args.get("tracker_type")
+        or get_current_webcam_tracker_type()
+    )
+
+    processor = get_webcam_processor(tracker_type=selected_tracker)
+    info = processor.start()
+    info["tracker_type"] = getattr(processor, "tracker_type", selected_tracker)
+    info["tracker_label"] = get_tracker_label(info["tracker_type"])
+
+    return jsonify(info)
 
 
 @app.route("/webcam/stop_worker", methods=["POST"])
 def webcam_stop_worker():
     """
-    Route ẩn để frontend tự tắt webcam worker khi rời trang webcam.
-    Nếu đang record, hệ thống sẽ cố finalize record trước khi tắt camera.
+    Internal route used by the frontend to stop the webcam worker.
+
+    If recording is active, the system tries to finalize the recording before
+    releasing the camera.
     """
 
     processor = get_webcam_processor()
@@ -426,7 +704,7 @@ def webcam_stop_worker():
 
     return jsonify({
         "success": True,
-        "message": "Đã dừng webcam worker.",
+        "message": "Webcam worker stopped.",
         "worker": stop_info,
         "recording": recording_result,
     })
@@ -436,7 +714,13 @@ def webcam_stop_worker():
 def webcam_start_record():
     global latest_webcam_recording
 
-    run_id = f"{timestamp_now()}_webcam"
+    processor = get_webcam_processor()
+    tracker_type = normalize_webcam_tracker(
+        getattr(processor, "tracker_type", DEFAULT_WEBCAM_TRACKER)
+    )
+    tracker_label = get_tracker_label(tracker_type)
+
+    run_id = f"{timestamp_now()}_webcam_{tracker_type}"
     output_video_name = f"{run_id}_tracking.mp4"
     output_txt_name = f"{run_id}_tracking.txt"
 
@@ -455,8 +739,6 @@ def webcam_start_record():
         output_txt_name,
     )
 
-    processor = get_webcam_processor()
-
     info = processor.start_recording(
         static_output_path=static_output_path,
         result_output_path=result_output_path,
@@ -472,6 +754,8 @@ def webcam_start_record():
             "static_path": static_output_path,
             "result_path": result_output_path,
             "txt_path": txt_output_path,
+            "tracker_type": tracker_type,
+            "tracker_label": tracker_label,
         }
 
     return jsonify({
@@ -479,6 +763,8 @@ def webcam_start_record():
         "message": info.get("message", ""),
         "run_id": run_id if info.get("success") else latest_webcam_recording.get("run_id"),
         "filename": output_video_name if info.get("success") else latest_webcam_recording.get("filename"),
+        "tracker_type": tracker_type,
+        "tracker_label": tracker_label,
     })
 
 
@@ -495,11 +781,11 @@ def webcam_stop_record():
 
 def _save_webcam_recording_metrics(info):
     """
-    Lưu metrics cho phiên webcam record đã hoàn tất.
+    Save metrics for a completed webcam recording session.
 
-    Hàm này được dùng bởi:
+    This helper is used by:
         - /webcam/stop_record
-        - /webcam/stop_worker nếu người dùng rời trang khi đang record
+        - /webcam/stop_worker when the user leaves while recording
     """
 
     run_id = latest_webcam_recording.get("run_id") or timestamp_now()
@@ -520,12 +806,20 @@ def _save_webcam_recording_metrics(info):
         fps=float(info.get("fps", 20.0)),
     )
 
+    tracker_type = normalize_webcam_tracker(
+        latest_webcam_recording.get("tracker_type")
+        or info.get("tracker_type")
+        or get_current_webcam_tracker_type()
+    )
+    tracker_label = get_tracker_label(tracker_type)
+
     metrics_data = {
         "run_id": run_id,
         "mode": "webcam",
-        "model": VEHICLE_MODEL_NAME,
+        "model": f"YOLOv5n + {tracker_label} Webcam Tracking",
         "yolo_model_path": MODEL_PATH,
-        "tracker": "DeepSORT",
+        "tracker": tracker_type,
+        "tracker_label": tracker_label,
         "device": DEVICE,
         "confidence_threshold": CONF_THRESHOLD,
         "image_size": IMAGE_SIZE,
@@ -541,8 +835,10 @@ def _save_webcam_recording_metrics(info):
 
     return {
         "success": True,
-        "message": info.get("message", "Đã dừng ghi webcam."),
+        "message": info.get("message", "Webcam recording stopped."),
         "run_id": run_id,
+        "tracker_type": tracker_type,
+        "tracker_label": tracker_label,
         "frame_count": info.get("frame_count", 0),
         "duration_sec": info.get("duration_sec", 0),
         "fps": info.get("fps", 0),
@@ -589,14 +885,14 @@ def results_page():
 
 def _group_result_runs(mode: str):
     """
-    Gom kết quả theo từng lần chạy cho cả dataset/upload/webcam.
+    Group result artifacts by run ID for dataset, upload, webcam, and compare modes.
 
-    Chỉ hiển thị run hợp lệ:
-        - Có output video, hoặc
-        - Có metrics JSON
+    A run is shown only when it has either:
+        - an output video, or
+        - a metrics JSON file.
 
-    Những run chỉ có TXT sẽ bị ẩn khỏi Results.
-    Trường hợp này hay xảy ra khi webcam bấm Start Record nhưng chưa ghi được frame/video.
+    TXT-only runs are hidden because they usually come from incomplete webcam
+    recording sessions that did not produce a valid video.
     """
 
     grouped = {}

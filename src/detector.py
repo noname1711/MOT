@@ -8,9 +8,9 @@ from src.utils import VEHICLE_CLASS_IDS, VEHICLE_CLASS_NAMES
 
 class YOLODetector:
     """
-    Wrapper YOLOv5/Ultralytics dùng để phát hiện vehicle.
+    YOLOv5/Ultralytics wrapper for vehicle detection.
 
-    Vehicle COCO classes:
+    Target COCO vehicle classes:
         2 -> car
         3 -> motorcycle
         5 -> bus

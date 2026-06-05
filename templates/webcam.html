@@ -7,14 +7,39 @@
     <div>
         <div class="eyebrow">Realtime Monitoring</div>
         <h1>Webcam Mode</h1>
-        <p>Stream camera realtime, theo dõi phương tiện trực tiếp và ghi lại phiên tracking.</p>
+        <p>Stream a camera in realtime, track vehicles directly, and record tracking sessions.</p>
     </div>
+</section>
+
+<section class="panel webcam-control-panel">
+    <form method="get" action="{{ url_for('webcam') }}" class="webcam-tracker-form">
+        <div class="form-group">
+            <label for="webcam-tracker-select">Select tracker</label>
+            <select id="webcam-tracker-select" name="tracker_type">
+                {% for tracker in tracker_options %}
+                    <option value="{{ tracker.value }}" {% if tracker.value == selected_tracker %}selected{% endif %}>
+                        {{ tracker.label }}
+                    </option>
+                {% endfor %}
+            </select>
+            <small>
+                Current webcam tracker:
+                <strong>{{ selected_tracker_label }}</strong>.
+                Changing the tracker restarts the webcam worker with a new pipeline.
+            </small>
+        </div>
+
+        <button class="btn btn-secondary" type="submit">Apply Tracker</button>
+    </form>
 </section>
 
 <section class="webcam-layout">
     <div class="panel webcam-stream-panel">
         <div class="stream-header">
-            <h2>Live Stream</h2>
+            <div>
+                <h2>Live Webcam Stream</h2>
+                <small>Tracker: <strong>{{ selected_tracker_label }}</strong></small>
+            </div>
             <span class="live-badge">LIVE</span>
         </div>
 
@@ -23,8 +48,8 @@
         </div>
 
         <div class="actions">
-            <button class="btn btn-primary" id="start-record">Start Record</button>
-            <button class="btn btn-danger" id="stop-record">Stop Record</button>
+            <button class="btn btn-primary" id="start-record">Start Recording</button>
+            <button class="btn btn-danger" id="stop-record">Stop Recording</button>
         </div>
     </div>
 
@@ -36,6 +61,11 @@
                 <div class="metric-card primary">
                     <span>Live FPS</span>
                     <strong id="metric-live-fps">0</strong>
+                </div>
+
+                <div class="metric-card">
+                    <span>Tracker</span>
+                    <strong id="metric-tracker">{{ selected_tracker_label }}</strong>
                 </div>
 
                 <div class="metric-card">
@@ -88,7 +118,7 @@
         <div class="panel">
             <h3>Recording Result</h3>
             <div id="recording-result" class="recording-result">
-                Chưa có phiên ghi hình.
+                No recording session yet.
             </div>
         </div>
     </aside>

@@ -1021,3 +1021,418 @@ video,
         justify-content: flex-start;
     }
 }
+
+/* ============================================================
+   Tracker comparison UI
+   ============================================================ */
+
+.analysis-form,
+.upload-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.tracker-note {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    font-size: 14px;
+}
+
+.tracker-note strong {
+    color: #0f172a;
+}
+
+.comparison-table-wrap {
+    overflow-x: auto;
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.comparison-table {
+    width: 100%;
+    min-width: 1000px;
+    border-collapse: collapse;
+}
+
+.comparison-table th,
+.comparison-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.comparison-table th {
+    background: #f8fafc;
+    color: #334155;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.comparison-table td {
+    color: #0f172a;
+}
+
+.comparison-table td small {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+}
+
+.file-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.file-links a {
+    color: #0284c7;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.file-links a:hover {
+    text-decoration: underline;
+}
+
+.compare-video-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.compare-video-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.compare-video-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.compare-video-header h3 {
+    margin: 4px 0 0;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.mini-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.mini-metrics div {
+    padding: 12px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.mini-metrics span {
+    display: block;
+    color: #64748b;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.mini-metrics strong {
+    color: #0f172a;
+    font-size: 18px;
+}
+
+@media (max-width: 900px) {
+    .form-grid,
+    .compare-video-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* ============================================================
+   Tracker comparison UI
+   ============================================================ */
+
+.analysis-form,
+.upload-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.tracker-note {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    font-size: 14px;
+}
+
+.tracker-note strong {
+    color: #0f172a;
+}
+
+.comparison-table-wrap {
+    overflow-x: auto;
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.comparison-table {
+    width: 100%;
+    min-width: 1000px;
+    border-collapse: collapse;
+}
+
+.comparison-table th,
+.comparison-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.comparison-table th {
+    background: #f8fafc;
+    color: #334155;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.comparison-table td {
+    color: #0f172a;
+}
+
+.comparison-table td small {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+}
+
+.file-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.file-links a {
+    color: #0284c7;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.file-links a:hover {
+    text-decoration: underline;
+}
+
+.compare-video-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.compare-video-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.compare-video-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.compare-video-header h3 {
+    margin: 4px 0 0;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.mini-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.mini-metrics div {
+    padding: 12px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.mini-metrics span {
+    display: block;
+    color: #64748b;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.mini-metrics strong {
+    color: #0f172a;
+    font-size: 18px;
+}
+
+@media (max-width: 900px) {
+    .form-grid,
+    .compare-video-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* Webcam tracker selector */
+.webcam-control-panel {
+    margin-bottom: 22px;
+}
+
+.webcam-tracker-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.webcam-tracker-form .form-group {
+    min-width: 280px;
+    flex: 1;
+}
+
+.stream-header small {
+    color: #64748b;
+}
+
+@media (max-width: 700px) {
+    .webcam-tracker-form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
+
+/* ============================================================
+   Final UI alignment fixes
+   ============================================================ */
+
+.upload-form,
+.analysis-form {
+    align-items: stretch;
+}
+
+.upload-form .form-grid,
+.analysis-form .form-grid {
+    width: 100%;
+}
+
+.upload-form .tracker-note,
+.analysis-form .tracker-note {
+    width: 100%;
+    align-self: stretch;
+    margin-top: 2px;
+}
+
+.upload-form .form-actions,
+.analysis-form .form-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.upload-form .form-group small,
+.analysis-form .form-group small {
+    line-height: 1.45;
+}
+
+.webcam-control-panel {
+    margin-bottom: 24px;
+}
+
+.webcam-tracker-form {
+    align-items: flex-end;
+}
+
+.webcam-tracker-form small {
+    line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+    .upload-form .form-actions,
+    .analysis-form .form-actions {
+        justify-content: stretch;
+    }
+
+    .upload-form .form-actions .btn,
+    .analysis-form .form-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+
+/* Match Upload submit button style with Dataset Run Evaluation button */
+.upload-form .form-actions {
+    width: 100%;
+    display: flex;
+    justify-content: stretch;
+}
+
+.upload-form .form-actions .btn {
+    width: 100%;
+    justify-content: center;
+}
+

@@ -2,18 +2,18 @@ import time
 from typing import Any, Dict
 
 from src.detector import YOLODetector
-from src.tracker import DeepSORTTracker
+from src.tracker import create_tracker
 from src.visualizer import draw_tracks
 
 
 class VehicleTrackingPipeline:
     """
-    Pipeline dùng chung cho cả:
-        - Dataset mode
-        - Upload mode
-        - Webcam mode
+    Shared frame-processing pipeline.
 
-    Frame -> YOLODetector -> DeepSORTTracker -> Visualizer
+    The same pipeline is used by dataset, upload, and webcam modes.
+
+    Flow:
+        frame -> YOLODetector -> Tracker -> Visualizer
     """
 
     def __init__(
@@ -24,8 +24,11 @@ class VehicleTrackingPipeline:
         device: str = "cpu",
         max_age: int = 30,
         n_init: int = 3,
-        max_cosine_distance: float = 0.4
+        max_cosine_distance: float = 0.4,
+        tracker_type: str = "deepsort",
     ):
+        self.tracker_type = tracker_type
+
         self.detector = YOLODetector(
             model_path=yolo_model_path,
             conf_threshold=conf_threshold,
@@ -33,7 +36,8 @@ class VehicleTrackingPipeline:
             device=device
         )
 
-        self.tracker = DeepSORTTracker(
+        self.tracker = create_tracker(
+            tracker_type=tracker_type,
             max_age=max_age,
             n_init=n_init,
             max_cosine_distance=max_cosine_distance
@@ -59,5 +63,6 @@ class VehicleTrackingPipeline:
             "tracks": tracks,
             "detector_time": detector_time,
             "tracker_time": tracker_time,
-            "total_time": detector_time + tracker_time
+            "total_time": detector_time + tracker_time,
+            "tracker_type": self.tracker_type,
         }

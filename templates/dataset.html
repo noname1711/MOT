@@ -7,19 +7,48 @@
     <div>
         <div class="eyebrow">Ground Truth Evaluation</div>
         <h1>Dataset Mode</h1>
-        <p>Chạy hệ thống trên dataset có ground truth để đánh giá detection và tracking.</p>
+        <p>Run tracking on datasets with ground truth to evaluate and compare the original DeepSORT baseline with the custom tracker.</p>
     </div>
 </section>
 
 <section class="panel">
-    <form method="post" class="form-row">
-        <div class="form-group">
-            <label>Chọn dataset</label>
-            <select name="dataset_name" required>
-                {% for dataset in datasets %}
-                    <option value="{{ dataset.name }}">{{ dataset.name }}</option>
-                {% endfor %}
-            </select>
+    <form method="post" class="analysis-form">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Select dataset</label>
+                <select name="dataset_name" required>
+                    {% for dataset in datasets %}
+                        <option value="{{ dataset.name }}">{{ dataset.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Select tracker</label>
+                <select name="tracker_type" required>
+                    {% for tracker in tracker_options %}
+                        <option value="{{ tracker.value }}" {% if tracker.value == selected_tracker %}selected{% endif %}>
+                            {{ tracker.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <small>Select “Compare both” to run the original DeepSORT and Custom DeepSORT on the same video.</small>
+            </div>
+
+            <div class="form-group">
+                <label>Frame limit</label>
+                <input type="number" name="max_frames" min="1" placeholder="Leave empty to process all frames">
+                <small>Use this for quick tests, for example 100 frames.</small>
+            </div>
+        </div>
+
+        <div class="tracker-note">
+            {% for tracker in tracker_options %}
+                <div>
+                    <strong>{{ tracker.label }}:</strong>
+                    <span>{{ tracker.description }}</span>
+                </div>
+            {% endfor %}
         </div>
 
         <button class="btn btn-primary" type="submit">Run Evaluation</button>
@@ -27,7 +56,7 @@
 
     {% if not datasets %}
         <div class="alert alert-warning">
-            Không tìm thấy dataset trong <code>data/vehicle_tracking</code>.
+            No dataset found in <code>data/vehicle_tracking</code>.
         </div>
     {% endif %}
 
@@ -36,12 +65,120 @@
     {% endif %}
 </section>
 
-{% if result %}
+{% if result and result.compare %}
+<section class="section">
+    <div class="result-title">
+        <div>
+            <div class="eyebrow">Comparison Run</div>
+            <h2>{{ result.run_id }}</h2>
+            <p>Dataset: <strong>{{ result.dataset_name }}</strong>
+                {% if result.max_frames %} · Limit: <strong>{{ result.max_frames }} frames</strong>{% endif %}
+            </p>
+        </div>
+
+        <div class="download-group">
+            {% if result.summary_download_url %}
+                <a class="btn btn-secondary" href="{{ result.summary_download_url }}">Download Summary</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="section-heading">
+        <h2>Model Comparison</h2>
+        <p>The table focuses on speed, accuracy, and ID stability.</p>
+    </div>
+
+    <div class="comparison-table-wrap">
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Tracker</th>
+                    <th>FPS</th>
+                    <th>Tracker Time</th>
+                    <th>Unique Tracks</th>
+                    <th>Avg Obj/Frame</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F1</th>
+                    <th>MOTA Proxy</th>
+                    <th>ID Switches</th>
+                    <th>Files</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in result.comparison %}
+                <tr>
+                    <td>
+                        <strong>{{ row.tracker_label }}</strong>
+                        <small>{{ row.tracker }}</small>
+                    </td>
+                    <td>{{ row.processing_fps }}</td>
+                    <td>{{ row.avg_tracker_time_ms }} ms</td>
+                    <td>{{ row.unique_tracks }}</td>
+                    <td>{{ row.avg_objects_per_frame }}</td>
+                    <td>{{ row.precision | default("-", true) }}</td>
+                    <td>{{ row.recall | default("-", true) }}</td>
+                    <td>{{ row.f1_score | default("-", true) }}</td>
+                    <td>{{ row.mota_proxy | default("-", true) }}</td>
+                    <td>{{ row.id_switches_proxy | default("-", true) }}</td>
+                    <td class="file-links">
+                        {% if row.video_download_url %}<a href="{{ row.video_download_url }}">Video</a>{% endif %}
+                        {% if row.txt_download_url %}<a href="{{ row.txt_download_url }}">TXT</a>{% endif %}
+                        {% if row.metrics_download_url %}<a href="{{ row.metrics_download_url }}">Metrics</a>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section">
+    <div class="compare-video-grid">
+        {% for row in result.comparison %}
+        <div class="panel compare-video-card">
+            <div class="compare-video-header">
+                <div>
+                    <div class="eyebrow">{{ row.tracker }}</div>
+                    <h3>{{ row.tracker_label }}</h3>
+                </div>
+                <span class="badge">{{ row.processing_fps }} FPS</span>
+            </div>
+
+            {% if row.video_url %}
+            <div class="video-panel">
+                <video controls>
+                    <source src="{{ row.video_url }}" type="video/mp4">
+                </video>
+            </div>
+            {% endif %}
+
+            <div class="mini-metrics">
+                <div><span>Tracker time</span><strong>{{ row.avg_tracker_time_ms }} ms</strong></div>
+                <div><span>Unique tracks</span><strong>{{ row.unique_tracks }}</strong></div>
+                <div><span>ID switches</span><strong>{{ row.id_switches_proxy | default("-", true) }}</strong></div>
+                <div><span>F1-score</span><strong>{{ row.f1_score | default("-", true) }}</strong></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section">
+    <details class="raw-json">
+        <summary>View full comparison summary JSON</summary>
+        <pre>{{ result.summary | tojson(indent=2) }}</pre>
+    </details>
+</section>
+{% endif %}
+
+{% if result and not result.compare %}
 <section class="section">
     <div class="result-title">
         <div>
             <div class="eyebrow">Run ID</div>
             <h2>{{ result.run_id }}</h2>
+            <p>Tracker: <strong>{{ result.tracker_label }}</strong></p>
         </div>
 
         <div class="download-group">
@@ -61,56 +198,44 @@
 <section class="section">
     <div class="section-heading">
         <h2>Evaluation Metrics</h2>
-        <p>Các chỉ số đánh giá với ground truth. Đây là evaluation proxy dựa trên IoU matching.</p>
+        <p>Ground-truth evaluation based on IoU matching. These are lightweight proxy metrics for project-level comparison.</p>
     </div>
 
     <div class="metrics-grid">
         <div class="metric-card primary">
             <span>Precision</span>
             <strong>{{ result.metrics.evaluation.precision | default(0) }}</strong>
-            <small>Dự đoán đúng / tổng dự đoán</small>
+            <small>Correct predictions over total predictions</small>
         </div>
 
         <div class="metric-card primary">
             <span>Recall</span>
             <strong>{{ result.metrics.evaluation.recall | default(0) }}</strong>
-            <small>Phát hiện đúng / tổng ground truth</small>
+            <small>Correct detections over total ground truth objects</small>
         </div>
 
         <div class="metric-card primary">
             <span>F1-score</span>
             <strong>{{ result.metrics.evaluation.f1_score | default(0) }}</strong>
-            <small>Cân bằng precision và recall</small>
+            <small>Balance between precision and recall</small>
         </div>
 
         <div class="metric-card">
             <span>MOTA Proxy</span>
             <strong>{{ result.metrics.evaluation.mota_proxy | default(0) }}</strong>
-            <small>Tracking accuracy proxy</small>
-        </div>
-
-        <div class="metric-card">
-            <span>MOTP Proxy</span>
-            <strong>{{ result.metrics.evaluation.motp_proxy | default(0) }}</strong>
-            <small>Độ khớp bbox trung bình</small>
+            <small>Approximate tracking accuracy</small>
         </div>
 
         <div class="metric-card">
             <span>ID Switches</span>
             <strong>{{ result.metrics.evaluation.id_switches_proxy | default(0) }}</strong>
-            <small>Số lần đổi ID ước lượng</small>
+            <small>Estimated identity switches</small>
         </div>
 
         <div class="metric-card">
-            <span>False Positive</span>
-            <strong>{{ result.metrics.evaluation.false_positive | default(0) }}</strong>
-            <small>Dự đoán thừa</small>
-        </div>
-
-        <div class="metric-card">
-            <span>False Negative</span>
-            <strong>{{ result.metrics.evaluation.false_negative | default(0) }}</strong>
-            <small>Bỏ sót object</small>
+            <span>MOTP Proxy</span>
+            <strong>{{ result.metrics.evaluation.motp_proxy | default(0) }}</strong>
+            <small>Average bounding-box match quality</small>
         </div>
     </div>
 </section>
@@ -123,8 +248,6 @@
             <div><span>Total GT tracks</span><strong>{{ result.metrics.groundtruth_statistics.total_groundtruth_tracks }}</strong></div>
             <div><span>Annotated frames</span><strong>{{ result.metrics.groundtruth_statistics.annotated_frames }}</strong></div>
             <div><span>Avg objects/frame</span><strong>{{ result.metrics.groundtruth_statistics.avg_objects_per_frame }}</strong></div>
-            <div><span>Max objects/frame</span><strong>{{ result.metrics.groundtruth_statistics.max_objects_per_frame }}</strong></div>
-            <div><span>Avg track length</span><strong>{{ result.metrics.groundtruth_statistics.avg_track_length_frames }}</strong></div>
         </div>
     </div>
 
@@ -135,7 +258,6 @@
             <div><span>Visible predictions</span><strong>{{ result.metrics.prediction_statistics.total_visible_prediction_rows }}</strong></div>
             <div><span>Unique predicted tracks</span><strong>{{ result.metrics.prediction_statistics.unique_predicted_tracks }}</strong></div>
             <div><span>Avg predicted objects/frame</span><strong>{{ result.metrics.prediction_statistics.avg_predicted_objects_per_frame }}</strong></div>
-            <div><span>Max predicted objects/frame</span><strong>{{ result.metrics.prediction_statistics.max_predicted_objects_per_frame }}</strong></div>
         </div>
     </div>
 </section>
@@ -166,7 +288,7 @@
 
 <section class="section">
     <details class="raw-json">
-        <summary>Xem toàn bộ metrics JSON</summary>
+        <summary>View full metrics JSON</summary>
         <pre>{{ result.metrics | tojson(indent=2) }}</pre>
     </details>
 </section>

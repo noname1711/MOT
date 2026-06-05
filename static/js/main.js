@@ -1,5 +1,12 @@
-async function postJson(url) {
-    const response = await fetch(url, { method: "POST" });
+async function postJson(url, payload = null) {
+    const options = { method: "POST" };
+
+    if (payload !== null) {
+        options.headers = { "Content-Type": "application/json" };
+        options.body = JSON.stringify(payload);
+    }
+
+    const response = await fetch(url, options);
     return await response.json();
 }
 
@@ -18,6 +25,19 @@ function setText(id, value) {
 
 function isWebcamPage() {
     return document.getElementById("metric-live-fps") !== null;
+}
+
+function getSelectedWebcamTracker() {
+    const select = document.getElementById("webcam-tracker-select");
+    return select ? select.value : "deepsort";
+}
+
+function getWebcamTrackerLabel(trackerType) {
+    if (trackerType === "custom") {
+        return "Custom DeepSORT";
+    }
+
+    return "Original DeepSORT";
 }
 
 function stopWebcamWorkerSync() {
@@ -41,7 +61,9 @@ async function startWebcamWorker() {
     }
 
     try {
-        await postJson("/webcam/start_worker");
+        await postJson("/webcam/start_worker", {
+            tracker_type: getSelectedWebcamTracker()
+        });
     } catch (error) {
         console.warn("Cannot start webcam worker:", error);
     }
@@ -85,6 +107,7 @@ function renderRecordingResult(data) {
 
             <div class="stats-list">
                 <div><span>Run ID</span><strong>${data.run_id || "-"}</strong></div>
+                <div><span>Tracker</span><strong>${data.tracker_label || getWebcamTrackerLabel(data.tracker_type)}</strong></div>
                 <div><span>Frames</span><strong>${data.frame_count || 0}</strong></div>
                 <div><span>Duration</span><strong>${data.duration_sec || 0}s</strong></div>
                 <div><span>Average FPS</span><strong>${data.fps || 0}</strong></div>
@@ -133,6 +156,7 @@ async function refreshWebcamMetrics() {
         const data = await getJson("/webcam/metrics");
 
         setText("metric-live-fps", data.live_fps ?? 0);
+        setText("metric-tracker", getWebcamTrackerLabel(data.tracker_type));
         setText("metric-average-fps", data.average_fps ?? 0);
         setText("metric-current-vehicles", data.current_active_tracks ?? 0);
         setText("metric-total-ids", data.total_unique_tracks ?? 0);
@@ -161,10 +185,10 @@ async function refreshWebcamMetrics() {
 
 /*
     Webcam lifecycle:
-    - Vào /webcam: app.py đã start worker.
-    - Rời trang / đóng tab / reload: stop worker để tắt camera laptop.
-    - Chuyển sang browser tab khác: stop worker để tắt camera.
-    - Quay lại tab webcam: start worker lại.
+    - Enter /webcam: the backend starts the worker.
+    - Leave, close, or reload the page: stop the worker to release the camera.
+    - Hide the browser tab: stop the worker to release the camera.
+    - Return to the webcam tab: start the worker again.
 */
 if (isWebcamPage()) {
     window.addEventListener("pagehide", () => {
