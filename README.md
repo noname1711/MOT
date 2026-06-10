@@ -137,7 +137,7 @@ This mode supports:
 
 ### 4. Compare Mode
 
-Compare the original DeepSORT tracker with the Custom DeepSORT V2 tracker on the same video or dataset.
+Compare the original DeepSORT tracker with the Custom DeepSORT tracker on the same video or dataset.
 
 The comparison includes:
 
@@ -204,7 +204,7 @@ Pretrained Re-ID model
 
 This tracker is used as the baseline for comparison.
 
-### Custom DeepSORT V2
+### Custom DeepSORT
 
 The custom tracker is implemented inside:
 
@@ -222,7 +222,7 @@ Hungarian Assignment
 Track Lifecycle
 ```
 
-The optimized Custom DeepSORT V2 uses:
+The optimized Custom DeepSORT uses:
 
 * Kalman Filter for motion prediction
 * HSV + LAB histogram features for appearance representation
@@ -432,7 +432,7 @@ The updated results show that Custom DeepSORT achieves significantly higher proc
 
 In terms of tracking quality, Custom DeepSORT improves precision, MOTP proxy, MOTA proxy, and ID stability on both datasets. The MOTP proxy is computed as the average IoU of matched ground-truth and predicted bounding boxes, so a higher value indicates better localization quality. Custom DeepSORT obtains higher MOTP proxy on VNTraffic, increasing from 0.8169 to 0.8212, and on AICC22-Custom, increasing from 0.8416 to 0.8583. It also reduces ID switches from 35 to 23 on VNTraffic and from 5 to 1 on AICC22-Custom.
 
-Overall, the results indicate that Custom DeepSORT V2 is more lightweight and stable than the original DeepSORT baseline. It provides much faster tracking speed, better localization quality, fewer identity switches, and higher MOTA proxy, while maintaining competitive F1-score performance.
+Overall, the results indicate that Custom DeepSORT is more lightweight and stable than the original DeepSORT baseline. It provides much faster tracking speed, better localization quality, fewer identity switches, and higher MOTA proxy, while maintaining competitive F1-score performance.
 
 ---
 
@@ -441,7 +441,7 @@ Overall, the results indicate that Custom DeepSORT V2 is more lightweight and st
 * The current implementation is CPU-friendly.
 * The default detector is YOLOv5n.
 * The custom tracker does not use a deep Re-ID model.
-* Appearance matching in Custom DeepSORT V2 is based on HSV and LAB histogram features.
+* Appearance matching in Custom DeepSORT is based on HSV and LAB histogram features.
 * DeepSORT original is used as a baseline for comparison.
 * Metrics are proxy metrics and are computed using IoU-based matching with ground truth.
 
