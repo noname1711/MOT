@@ -78,7 +78,7 @@ webcam_processor = None
 
 latest_webcam_recording = {
     "run_id": None,
-    "filename": None,
+    "filename": None,  
     "txt_filename": None,
     "static_path": None,
     "result_path": None,

@@ -416,19 +416,23 @@ For datasets with ground truth, the system computes proxy tracking metrics based
 
 ### VNTraffic
 
-| Tracker            |     FPS | Tracker Time | Precision | Recall | F1-score | MOTA Proxy | ID Switches |
-| ------------------ | ------: | -----------: | --------: | -----: | -------: | ---------: | ----------: |
-| DeepSORT original  |  2.7941 |  160.0233 ms |    0.8319 | 0.2716 |   0.4096 |     0.2146 |          35 |
-| Custom DeepSORT V2 | 14.5728 |    6.5093 ms |    0.9257 | 0.2604 |   0.4065 |     0.2381 |          23 |
+| Tracker            |     FPS | Tracker Time | Unique Tracks | Avg Obj/Frame | Precision | Recall | F1-score | MOTP Proxy | MOTA Proxy | ID Switches |
+| ------------------ | ------: | -----------: | ------------: | ------------: | --------: | -----: | -------: | ---------: | ---------: | ----------: |
+| DeepSORT original  |  2.8974 |  155.4090 ms |            50 |       10.3071 |    0.8319 | 0.2716 |   0.4096 |     0.8169 |     0.2146 |          35 |
+| Custom DeepSORT    | 14.0458 |    6.6911 ms |            49 |        8.8625 |    0.9257 | 0.2604 |   0.4065 |     0.8212 |     0.2381 |          23 |
 
 ### AICC22-Custom
 
-| Tracker            |     FPS | Tracker Time | Precision | Recall | F1-score | MOTA Proxy | ID Switches |
-| ------------------ | ------: | -----------: | --------: | -----: | -------: | ---------: | ----------: |
-| DeepSORT original  |  4.9468 |   90.8557 ms |    0.5546 | 0.7030 |   0.6200 |     0.1342 |           5 |
-| Custom DeepSORT V2 | 16.0393 |    5.0226 ms |    0.7005 | 0.6810 |   0.6906 |     0.3890 |           1 |
+| Tracker            |     FPS | Tracker Time | Unique Tracks | Avg Obj/Frame | Precision | Recall | F1-score | MOTP Proxy | MOTA Proxy | ID Switches |
+| ------------------ | ------: | -----------: | ------------: | ------------: | --------: | -----: | -------: | ---------: | ---------: | ----------: |
+| DeepSORT original  |  4.7160 |   96.9407 ms |            32 |        7.5859 |    0.5546 | 0.7030 |   0.6200 |     0.8416 |     0.1342 |           5 |
+| Custom DeepSORT    | 16.7514 |    4.3423 ms |            28 |        5.7889 |    0.7005 | 0.6810 |   0.6906 |     0.8583 |     0.3890 |           1 |
 
-The results show that Custom DeepSORT V2 significantly improves processing speed and ID stability. It also improves MOTA proxy on both datasets, while maintaining competitive F1-score compared with the original DeepSORT baseline.
+The updated results show that Custom DeepSORT achieves significantly higher processing speed than the original DeepSORT baseline on both datasets. On VNTraffic, Custom DeepSORT increases the processing speed from 2.8974 FPS to 14.0458 FPS and reduces the average tracker time from 155.4090 ms to 6.6911 ms. On AICC22-Custom, it increases the processing speed from 4.7160 FPS to 16.7514 FPS and reduces the average tracker time from 96.9407 ms to 4.3423 ms.
+
+In terms of tracking quality, Custom DeepSORT improves precision, MOTP proxy, MOTA proxy, and ID stability on both datasets. The MOTP proxy is computed as the average IoU of matched ground-truth and predicted bounding boxes, so a higher value indicates better localization quality. Custom DeepSORT obtains higher MOTP proxy on VNTraffic, increasing from 0.8169 to 0.8212, and on AICC22-Custom, increasing from 0.8416 to 0.8583. It also reduces ID switches from 35 to 23 on VNTraffic and from 5 to 1 on AICC22-Custom.
+
+Overall, the results indicate that Custom DeepSORT V2 is more lightweight and stable than the original DeepSORT baseline. It provides much faster tracking speed, better localization quality, fewer identity switches, and higher MOTA proxy, while maintaining competitive F1-score performance.
 
 ---
 

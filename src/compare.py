@@ -26,7 +26,9 @@ def compare_dataset_trackers(
     input_video_path = dataset_info.get("original_video_path")
 
     if not input_video_path:
-        raise FileNotFoundError(f"Dataset {dataset_name} does not contain Original-video.mp4")
+        raise FileNotFoundError(
+            f"Dataset {dataset_name} does not contain Original-video.mp4"
+        )
 
     ground_truth_records = load_ground_truth_records(dataset_info)
 
@@ -180,7 +182,11 @@ def compare_trackers_for_video(
         max_frames=max_frames,
     )
 
-    summary_path = os.path.join(metrics_result_dir, f"{run_id}_comparison_summary.json")
+    summary_path = os.path.join(
+        metrics_result_dir,
+        f"{run_id}_comparison_summary.json",
+    )
+
     save_json(summary, summary_path)
     summary["summary_path"] = summary_path
 
@@ -208,9 +214,17 @@ def _build_comparison_summary(
         rows.append({
             "tracker": tracker_key,
             "tracker_label": item["tracker_label"],
-            "processing_fps": round(float(process_info.get("process_fps", 0)), 4),
-            "avg_tracker_time_ms": round(float(process_info.get("avg_tracker_time", 0)) * 1000, 4),
+
+            "processing_fps": round(
+                float(process_info.get("process_fps", 0)),
+                4,
+            ),
+            "avg_tracker_time_ms": round(
+                float(process_info.get("avg_tracker_time", 0)) * 1000,
+                4,
+            ),
             "total_frames": int(process_info.get("total_frames", 0)),
+
             "unique_tracks": (
                 prediction_stats.get("unique_predicted_tracks")
                 if prediction_stats
@@ -221,11 +235,19 @@ def _build_comparison_summary(
                 if prediction_stats
                 else vehicle_stats.get("avg_vehicles_per_frame")
             ),
+
             "precision": evaluation.get("precision"),
             "recall": evaluation.get("recall"),
             "f1_score": evaluation.get("f1_score"),
+
+            # Dataset mode only:
+            # MOTP proxy is average matched IoU.
+            # Upload mode has no ground truth, so this value will be None.
+            "motp_proxy": evaluation.get("motp_proxy"),
+            "average_matched_iou": evaluation.get("average_matched_iou"),
             "mota_proxy": evaluation.get("mota_proxy"),
             "id_switches_proxy": evaluation.get("id_switches_proxy"),
+
             "video_path": item["video_path"],
             "txt_path": item["txt_path"],
             "metrics_path": item["metrics_path"],
@@ -243,5 +265,9 @@ def _build_comparison_summary(
 
 
 def _safe_name(name: str) -> str:
-    cleaned = "".join(c if c.isalnum() or c in {"-", "_"} else "_" for c in str(name))
+    cleaned = "".join(
+        c if c.isalnum() or c in {"-", "_"} else "_"
+        for c in str(name)
+    )
+
     return cleaned.strip("_") or "video"

@@ -71,8 +71,11 @@
         <div>
             <div class="eyebrow">Comparison Run</div>
             <h2>{{ result.run_id }}</h2>
-            <p>Dataset: <strong>{{ result.dataset_name }}</strong>
-                {% if result.max_frames %} · Limit: <strong>{{ result.max_frames }} frames</strong>{% endif %}
+            <p>
+                Dataset: <strong>{{ result.dataset_name }}</strong>
+                {% if result.max_frames %}
+                    · Limit: <strong>{{ result.max_frames }} frames</strong>
+                {% endif %}
             </p>
         </div>
 
@@ -85,7 +88,9 @@
 
     <div class="section-heading">
         <h2>Model Comparison</h2>
-        <p>The table focuses on speed, accuracy, and ID stability.</p>
+        <p>
+            Compare FPS, tracker time, track count, Precision/Recall/F1, MOTP localization quality, MOTA tracking accuracy, and ID switches.
+        </p>
     </div>
 
     <div class="comparison-table-wrap">
@@ -100,6 +105,7 @@
                     <th>Precision</th>
                     <th>Recall</th>
                     <th>F1</th>
+                    <th>MOTP Proxy</th>
                     <th>MOTA Proxy</th>
                     <th>ID Switches</th>
                     <th>Files</th>
@@ -119,12 +125,19 @@
                     <td>{{ row.precision | default("-", true) }}</td>
                     <td>{{ row.recall | default("-", true) }}</td>
                     <td>{{ row.f1_score | default("-", true) }}</td>
+                    <td>{{ row.motp_proxy | default("-", true) }}</td>
                     <td>{{ row.mota_proxy | default("-", true) }}</td>
                     <td>{{ row.id_switches_proxy | default("-", true) }}</td>
                     <td class="file-links">
-                        {% if row.video_download_url %}<a href="{{ row.video_download_url }}">Video</a>{% endif %}
-                        {% if row.txt_download_url %}<a href="{{ row.txt_download_url }}">TXT</a>{% endif %}
-                        {% if row.metrics_download_url %}<a href="{{ row.metrics_download_url }}">Metrics</a>{% endif %}
+                        {% if row.video_download_url %}
+                            <a href="{{ row.video_download_url }}">Video</a>
+                        {% endif %}
+                        {% if row.txt_download_url %}
+                            <a href="{{ row.txt_download_url }}">TXT</a>
+                        {% endif %}
+                        {% if row.metrics_download_url %}
+                            <a href="{{ row.metrics_download_url }}">Metrics</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -154,10 +167,35 @@
             {% endif %}
 
             <div class="mini-metrics">
-                <div><span>Tracker time</span><strong>{{ row.avg_tracker_time_ms }} ms</strong></div>
-                <div><span>Unique tracks</span><strong>{{ row.unique_tracks }}</strong></div>
-                <div><span>ID switches</span><strong>{{ row.id_switches_proxy | default("-", true) }}</strong></div>
-                <div><span>F1-score</span><strong>{{ row.f1_score | default("-", true) }}</strong></div>
+                <div>
+                    <span>Tracker time</span>
+                    <strong>{{ row.avg_tracker_time_ms }} ms</strong>
+                </div>
+
+                <div>
+                    <span>Unique tracks</span>
+                    <strong>{{ row.unique_tracks }}</strong>
+                </div>
+
+                <div>
+                    <span>MOTP proxy</span>
+                    <strong>{{ row.motp_proxy | default("-", true) }}</strong>
+                </div>
+
+                <div>
+                    <span>MOTA proxy</span>
+                    <strong>{{ row.mota_proxy | default("-", true) }}</strong>
+                </div>
+
+                <div>
+                    <span>ID switches</span>
+                    <strong>{{ row.id_switches_proxy | default("-", true) }}</strong>
+                </div>
+
+                <div>
+                    <span>F1-score</span>
+                    <strong>{{ row.f1_score | default("-", true) }}</strong>
+                </div>
             </div>
         </div>
         {% endfor %}
@@ -198,7 +236,11 @@
 <section class="section">
     <div class="section-heading">
         <h2>Evaluation Metrics</h2>
-        <p>Ground-truth evaluation based on IoU matching. These are lightweight proxy metrics for project-level comparison.</p>
+        <p>
+            Ground-truth evaluation based on IoU matching.
+            These are lightweight proxy metrics for project-level comparison.
+            MOTP Proxy is computed as the average IoU of matched boxes.
+        </p>
     </div>
 
     <div class="metrics-grid">
@@ -221,6 +263,12 @@
         </div>
 
         <div class="metric-card">
+            <span>MOTP Proxy</span>
+            <strong>{{ result.metrics.evaluation.motp_proxy | default(0) }}</strong>
+            <small>Average IoU of matched boxes</small>
+        </div>
+
+        <div class="metric-card">
             <span>MOTA Proxy</span>
             <strong>{{ result.metrics.evaluation.mota_proxy | default(0) }}</strong>
             <small>Approximate tracking accuracy</small>
@@ -231,12 +279,6 @@
             <strong>{{ result.metrics.evaluation.id_switches_proxy | default(0) }}</strong>
             <small>Estimated identity switches</small>
         </div>
-
-        <div class="metric-card">
-            <span>MOTP Proxy</span>
-            <strong>{{ result.metrics.evaluation.motp_proxy | default(0) }}</strong>
-            <small>Average bounding-box match quality</small>
-        </div>
     </div>
 </section>
 
@@ -244,20 +286,50 @@
     <div class="panel">
         <h3>Ground Truth Statistics</h3>
         <div class="stats-list">
-            <div><span>Total GT boxes</span><strong>{{ result.metrics.groundtruth_statistics.total_groundtruth_boxes }}</strong></div>
-            <div><span>Total GT tracks</span><strong>{{ result.metrics.groundtruth_statistics.total_groundtruth_tracks }}</strong></div>
-            <div><span>Annotated frames</span><strong>{{ result.metrics.groundtruth_statistics.annotated_frames }}</strong></div>
-            <div><span>Avg objects/frame</span><strong>{{ result.metrics.groundtruth_statistics.avg_objects_per_frame }}</strong></div>
+            <div>
+                <span>Total GT boxes</span>
+                <strong>{{ result.metrics.groundtruth_statistics.total_groundtruth_boxes }}</strong>
+            </div>
+
+            <div>
+                <span>Total GT tracks</span>
+                <strong>{{ result.metrics.groundtruth_statistics.total_groundtruth_tracks }}</strong>
+            </div>
+
+            <div>
+                <span>Annotated frames</span>
+                <strong>{{ result.metrics.groundtruth_statistics.annotated_frames }}</strong>
+            </div>
+
+            <div>
+                <span>Avg objects/frame</span>
+                <strong>{{ result.metrics.groundtruth_statistics.avg_objects_per_frame }}</strong>
+            </div>
         </div>
     </div>
 
     <div class="panel">
         <h3>Prediction Statistics</h3>
         <div class="stats-list">
-            <div><span>Total prediction rows</span><strong>{{ result.metrics.prediction_statistics.total_prediction_rows }}</strong></div>
-            <div><span>Visible predictions</span><strong>{{ result.metrics.prediction_statistics.total_visible_prediction_rows }}</strong></div>
-            <div><span>Unique predicted tracks</span><strong>{{ result.metrics.prediction_statistics.unique_predicted_tracks }}</strong></div>
-            <div><span>Avg predicted objects/frame</span><strong>{{ result.metrics.prediction_statistics.avg_predicted_objects_per_frame }}</strong></div>
+            <div>
+                <span>Total prediction rows</span>
+                <strong>{{ result.metrics.prediction_statistics.total_prediction_rows }}</strong>
+            </div>
+
+            <div>
+                <span>Visible predictions</span>
+                <strong>{{ result.metrics.prediction_statistics.total_visible_prediction_rows }}</strong>
+            </div>
+
+            <div>
+                <span>Unique predicted tracks</span>
+                <strong>{{ result.metrics.prediction_statistics.unique_predicted_tracks }}</strong>
+            </div>
+
+            <div>
+                <span>Avg predicted objects/frame</span>
+                <strong>{{ result.metrics.prediction_statistics.avg_predicted_objects_per_frame }}</strong>
+            </div>
         </div>
     </div>
 </section>
@@ -270,14 +342,17 @@
                 <span>Processing FPS</span>
                 <strong>{{ result.metrics.performance.processing_fps }}</strong>
             </div>
+
             <div class="metric-card">
                 <span>Runtime</span>
                 <strong>{{ result.metrics.performance.elapsed_time_sec }}s</strong>
             </div>
+
             <div class="metric-card">
                 <span>Detector Time</span>
                 <strong>{{ result.metrics.performance.avg_detector_time_ms }}ms</strong>
             </div>
+
             <div class="metric-card">
                 <span>Tracker Time</span>
                 <strong>{{ result.metrics.performance.avg_tracker_time_ms }}ms</strong>

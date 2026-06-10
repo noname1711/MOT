@@ -48,8 +48,16 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
 
         frames = [int(x["frame"]) for x in items]
         confs = [float(x["confidence"]) for x in items]
-        visible_items = [x for x in items if int(x["visibility"]) == 1 and int(x["class_id"]) != -1]
-        predicted_items = [x for x in items if int(x["visibility"]) == 0 or int(x["class_id"]) == -1]
+
+        visible_items = [
+            x for x in items
+            if int(x["visibility"]) == 1 and int(x["class_id"]) != -1
+        ]
+
+        predicted_items = [
+            x for x in items
+            if int(x["visibility"]) == 0 or int(x["class_id"]) == -1
+        ]
 
         total_visible_rows += len(visible_items)
         total_predicted_rows += len(predicted_items)
@@ -76,13 +84,13 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
             "predicted_frames": len(predicted_items),
             "tracked_duration_seconds": round(duration_seconds, 3),
             "lifespan_seconds": round(lifespan_seconds, 3),
-            "avg_confidence": round(avg_conf, 4)
+            "avg_confidence": round(avg_conf, 4),
         })
 
     track_summaries = sorted(
         track_summaries,
         key=lambda x: x["frames_tracked"],
-        reverse=True
+        reverse=True,
     )
 
     total_frames_with_tracks = len(set(item["frame"] for item in records))
@@ -92,7 +100,11 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
         objects_per_frame[int(item["frame"])] += 1
 
     track_lengths = [item["frames_tracked"] for item in track_summaries]
-    short_tracks = [length for length in track_lengths if length <= max(3, int(fps * 0.5))]
+
+    short_tracks = [
+        length for length in track_lengths
+        if length <= max(3, int(fps * 0.5))
+    ]
 
     return {
         "tracking_txt_path": tracking_txt_path,
@@ -102,72 +114,100 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
         "total_predicted_rows": total_predicted_rows,
         "total_tracks": len(track_summaries),
         "frames_with_tracks": total_frames_with_tracks,
-        "avg_objects_per_frame": round(sum(objects_per_frame.values()) / len(objects_per_frame), 4) if objects_per_frame else 0,
+        "avg_objects_per_frame": round(
+            sum(objects_per_frame.values()) / len(objects_per_frame),
+            4,
+        ) if objects_per_frame else 0,
         "max_objects_per_frame": max(objects_per_frame.values()) if objects_per_frame else 0,
-        "avg_track_length_frames": round(sum(track_lengths) / len(track_lengths), 4) if track_lengths else 0,
+        "avg_track_length_frames": round(
+            sum(track_lengths) / len(track_lengths),
+            4,
+        ) if track_lengths else 0,
         "short_track_count": len(short_tracks),
-        "short_track_ratio": round(len(short_tracks) / len(track_lengths), 4) if track_lengths else 0,
-        "tracks": track_summaries
+        "short_track_ratio": round(
+            len(short_tracks) / len(track_lengths),
+            4,
+        ) if track_lengths else 0,
+        "tracks": track_summaries,
     }
 
 
 def build_upload_metrics(
     tracking_txt_path: str,
-    process_info: Dict[str, Any]
+    process_info: Dict[str, Any],
 ) -> Dict[str, Any]:
     stats = analyze_tracking_txt(
         tracking_txt_path=tracking_txt_path,
-        fps=float(process_info.get("original_fps", 25.0))
+        fps=float(process_info.get("original_fps", 25.0)),
     )
+
+    original_fps = float(process_info.get("original_fps", 0))
+    total_frames = int(process_info.get("total_frames", 0))
 
     return {
         "mode": "upload",
         "video_statistics": {
-            "total_frames": process_info.get("total_frames", 0),
+            "total_frames": total_frames,
             "width": process_info.get("width", 0),
             "height": process_info.get("height", 0),
-            "original_fps": round(float(process_info.get("original_fps", 0)), 4),
+            "original_fps": round(original_fps, 4),
             "duration_seconds": round(
-                process_info.get("total_frames", 0) / process_info.get("original_fps", 25.0),
-                4
-            ) if process_info.get("original_fps", 0) else 0
+                total_frames / original_fps,
+                4,
+            ) if original_fps > 0 else 0,
         },
         "vehicle_statistics": {
             "total_tracking_rows": stats["total_tracking_rows"],
             "total_visible_rows": stats["total_visible_rows"],
             "unique_tracked_vehicles": stats["total_tracks"],
             "avg_vehicles_per_frame": stats["avg_objects_per_frame"],
-            "max_vehicles_per_frame": stats["max_objects_per_frame"]
+            "max_vehicles_per_frame": stats["max_objects_per_frame"],
         },
         "tracking_behavior": {
             "avg_track_length_frames": stats["avg_track_length_frames"],
             "short_track_count": stats["short_track_count"],
-            "short_track_ratio": stats["short_track_ratio"]
+            "short_track_ratio": stats["short_track_ratio"],
         },
         "performance": {
             "elapsed_time_sec": round(float(process_info.get("elapsed_time", 0)), 4),
             "processing_fps": round(float(process_info.get("process_fps", 0)), 4),
-            "avg_detector_time_ms": round(float(process_info.get("avg_detector_time", 0)) * 1000, 4),
-            "avg_tracker_time_ms": round(float(process_info.get("avg_tracker_time", 0)) * 1000, 4)
+            "avg_detector_time_ms": round(
+                float(process_info.get("avg_detector_time", 0)) * 1000,
+                4,
+            ),
+            "avg_tracker_time_ms": round(
+                float(process_info.get("avg_tracker_time", 0)) * 1000,
+                4,
+            ),
         },
-        "track_details": stats["tracks"]
+        "track_details": stats["tracks"],
     }
 
 
 def evaluate_with_ground_truth(
     ground_truth_records: List[Dict[str, Any]],
     prediction_records: List[Dict[str, Any]],
-    iou_threshold: float = 0.5
+    iou_threshold: float = 0.5,
 ) -> Dict[str, Any]:
     """
     Compute lightweight tracking metrics for project-level evaluation.
 
     The evaluation uses greedy IoU matching per frame and reports:
-        - Precision, Recall, and F1-score
-        - False positives and false negatives
+        - Precision
+        - Recall
+        - F1-score
+        - False positives
+        - False negatives
         - MOTP proxy
-        - ID switch proxy
+        - ID switches proxy
         - MOTA proxy
+
+    Important:
+        This project uses IoU-based proxy metrics instead of official
+        MOTChallenge evaluation. Therefore, MOTP proxy is computed as the
+        average IoU of all matched ground-truth and prediction boxes.
+
+        Higher MOTP proxy means better bounding-box localization quality.
     """
 
     gt_by_frame = defaultdict(list)
@@ -219,7 +259,7 @@ def evaluate_with_ground_truth(
                 frame,
                 str(gt_items[gi]["track_id"]),
                 str(pred_items[pi]["track_id"]),
-                iou
+                iou,
             ))
 
         false_negative += len(gt_items) - len(used_gt)
@@ -229,12 +269,29 @@ def evaluate_with_ground_truth(
 
     precision = true_positive / total_pred if total_pred else 0
     recall = true_positive / total_gt if total_gt else 0
-    f1 = (2 * precision * recall / (precision + recall)) if precision + recall > 0 else 0
-    motp_proxy = sum(item[3] for item in matches) / len(matches) if matches else 0
+
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if precision + recall > 0
+        else 0
+    )
+
+    # MOTP proxy:
+    # In this project, localization quality is measured by IoU.
+    # Therefore, MOTP proxy is the average IoU over all matched boxes.
+    motp_proxy = (
+        sum(match_iou for _, _, _, match_iou in matches) / len(matches)
+        if matches
+        else 0
+    )
 
     id_switches = _count_id_switches(matches)
 
-    mota_proxy = 1 - ((false_negative + false_positive + id_switches) / total_gt) if total_gt else 0
+    mota_proxy = (
+        1 - ((false_negative + false_positive + id_switches) / total_gt)
+        if total_gt
+        else 0
+    )
 
     return {
         "iou_threshold": iou_threshold,
@@ -246,10 +303,10 @@ def evaluate_with_ground_truth(
         "precision": round(precision, 4),
         "recall": round(recall, 4),
         "f1_score": round(f1, 4),
-        "average_matched_iou": round(motp_proxy, 4),
         "motp_proxy": round(motp_proxy, 4),
+        "average_matched_iou": round(motp_proxy, 4),
         "id_switches_proxy": id_switches,
-        "mota_proxy": round(mota_proxy, 4)
+        "mota_proxy": round(mota_proxy, 4),
     }
 
 
@@ -258,19 +315,19 @@ def build_dataset_metrics(
     ground_truth_records: List[Dict[str, Any]],
     prediction_txt_path: str,
     process_info: Dict[str, Any],
-    groundtruth_summary: Dict[str, Any]
+    groundtruth_summary: Dict[str, Any],
 ) -> Dict[str, Any]:
     prediction_records = read_tracking_txt(prediction_txt_path)
 
     tracking_stats = analyze_tracking_txt(
         tracking_txt_path=prediction_txt_path,
-        fps=float(process_info.get("original_fps", 25.0))
+        fps=float(process_info.get("original_fps", 25.0)),
     )
 
     evaluation = evaluate_with_ground_truth(
         ground_truth_records=ground_truth_records,
         prediction_records=prediction_records,
-        iou_threshold=0.5
+        iou_threshold=0.5,
     )
 
     return {
@@ -280,7 +337,7 @@ def build_dataset_metrics(
             "total_frames": process_info.get("total_frames", 0),
             "width": process_info.get("width", 0),
             "height": process_info.get("height", 0),
-            "original_fps": round(float(process_info.get("original_fps", 0)), 4)
+            "original_fps": round(float(process_info.get("original_fps", 0)), 4),
         },
         "groundtruth_statistics": groundtruth_summary,
         "prediction_statistics": {
@@ -288,16 +345,22 @@ def build_dataset_metrics(
             "total_visible_prediction_rows": tracking_stats["total_visible_rows"],
             "unique_predicted_tracks": tracking_stats["total_tracks"],
             "avg_predicted_objects_per_frame": tracking_stats["avg_objects_per_frame"],
-            "max_predicted_objects_per_frame": tracking_stats["max_objects_per_frame"]
+            "max_predicted_objects_per_frame": tracking_stats["max_objects_per_frame"],
         },
         "evaluation": evaluation,
         "performance": {
             "elapsed_time_sec": round(float(process_info.get("elapsed_time", 0)), 4),
             "processing_fps": round(float(process_info.get("process_fps", 0)), 4),
-            "avg_detector_time_ms": round(float(process_info.get("avg_detector_time", 0)) * 1000, 4),
-            "avg_tracker_time_ms": round(float(process_info.get("avg_tracker_time", 0)) * 1000, 4)
+            "avg_detector_time_ms": round(
+                float(process_info.get("avg_detector_time", 0)) * 1000,
+                4,
+            ),
+            "avg_tracker_time_ms": round(
+                float(process_info.get("avg_tracker_time", 0)) * 1000,
+                4,
+            ),
         },
-        "track_details": tracking_stats["tracks"]
+        "track_details": tracking_stats["tracks"],
     }
 
 
