@@ -35,6 +35,11 @@ data/vehicle_tracking/
 │   ├── AICC22-Custom_GroundTruth.txt
 │   ├── AICC22-Custom_GroundTruth-video.mp4
 │   └── AICC22-Custom_Original-video.mp4
+├── CV
+│   ├── CV_GroundTruth.json
+│   ├── CV_GroundTruth.txt
+│   ├── CV_GroundTruth-video.mp4
+│   └── CV_Original-video.mp4
 └── VNTraffic
     ├── VNTraffic_GroundTruth.json
     ├── VNTraffic_GroundTruth.txt
@@ -306,6 +311,12 @@ Compare both trackers on the AICC22-Custom dataset:
 python scripts/compare_trackers.py --dataset AICC22-Custom
 ```
 
+Compare both trackers on the CV dataset:
+
+```bash
+python scripts/compare_trackers.py --dataset CV
+```
+
 Run a quick test with only the first 100 frames:
 
 ```bash
@@ -428,9 +439,16 @@ For datasets with ground truth, the system computes proxy tracking metrics based
 | DeepSORT original  |  4.7160 |   96.9407 ms |            32 |        7.5859 |    0.5546 | 0.7030 |   0.6200 |     0.8416 |     0.1342 |           5 |
 | Custom DeepSORT    | 16.7514 |    4.3423 ms |            28 |        5.7889 |    0.7005 | 0.6810 |   0.6906 |     0.8583 |     0.3890 |           1 |
 
-The updated results show that Custom DeepSORT achieves significantly higher processing speed than the original DeepSORT baseline on both datasets. On VNTraffic, Custom DeepSORT increases the processing speed from 2.8974 FPS to 14.0458 FPS and reduces the average tracker time from 155.4090 ms to 6.6911 ms. On AICC22-Custom, it increases the processing speed from 4.7160 FPS to 16.7514 FPS and reduces the average tracker time from 96.9407 ms to 4.3423 ms.
+### CV
 
-In terms of tracking quality, Custom DeepSORT improves precision, MOTP proxy, MOTA proxy, and ID stability on both datasets. The MOTP proxy is computed as the average IoU of matched ground-truth and predicted bounding boxes, so a higher value indicates better localization quality. Custom DeepSORT obtains higher MOTP proxy on VNTraffic, increasing from 0.8169 to 0.8212, and on AICC22-Custom, increasing from 0.8416 to 0.8583. It also reduces ID switches from 35 to 23 on VNTraffic and from 5 to 1 on AICC22-Custom.
+| Tracker            |     FPS | Tracker Time | Unique Tracks | Avg Obj/Frame | Precision | Recall | F1-score | MOTP Proxy | MOTA Proxy | ID Switches |
+| ------------------ | ------: | -----------: | ------------: | ------------: | --------: | -----: | -------: | ---------: | ---------: | ----------: |
+| DeepSORT original  |  2.7299 |  194.0146 ms |            44 |       10.2399 |    0.7535 |  0.397 |     0.52 |     0.7948 |     0.2599 |          66 |
+| Custom DeepSORT    | 14.8748 |    6.6443 ms |            37 |        8.3919 |    0.8758 |  0.379 |   0.5291 |     0.7957 |     0.3214 |          35 |
+
+The updated results show that Custom DeepSORT achieves significantly higher processing speed than the original DeepSORT baseline on all evaluated datasets. On VNTraffic, Custom DeepSORT increases the processing speed from 2.8974 FPS to 14.0458 FPS and reduces the average tracker time from 155.4090 ms to 6.6911 ms. On AICC22-Custom, it increases the processing speed from 4.7160 FPS to 16.7514 FPS and reduces the average tracker time from 96.9407 ms to 4.3423 ms. On CV, it increases the processing speed from 2.7299 FPS to 14.8748 FPS and reduces the average tracker time from 194.0146 ms to 6.6443 ms.
+
+In terms of tracking quality, Custom DeepSORT improves precision, MOTP proxy, MOTA proxy, and ID stability across the evaluated datasets. The MOTP proxy is computed as the average IoU of matched ground-truth and predicted bounding boxes, so a higher value indicates better localization quality. Custom DeepSORT obtains higher MOTP proxy on VNTraffic, increasing from 0.8169 to 0.8212; on AICC22-Custom, increasing from 0.8416 to 0.8583; and on CV, increasing from 0.7948 to 0.7957. It also reduces ID switches from 35 to 23 on VNTraffic, from 5 to 1 on AICC22-Custom, and from 66 to 35 on CV.
 
 Overall, the results indicate that Custom DeepSORT is more lightweight and stable than the original DeepSORT baseline. It provides much faster tracking speed, better localization quality, fewer identity switches, and higher MOTA proxy, while maintaining competitive F1-score performance.
 
