@@ -149,13 +149,17 @@ def cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
     if a_norm <= 0 or b_norm <= 0:
         return 1.0
 
+    # Compute cosine similarity.
+    # Example: a = [3, 4], b = [6, 8]
+    # dot(a, b) = 3*6 + 4*8 = 50, ||a|| = 5, ||b|| = 10
+    # similarity = dot(a,b) / (||a|| * ||b||) = 50 / (5*10) = 1.0
     similarity = float(np.dot(a, b) / (a_norm * b_norm))
 
-    # Clamp the value to avoid numerical precision issues.
+    # Clamp to the valid range [-1, 1] to avoid floating-point errors.
     similarity = max(-1.0, min(1.0, similarity))
 
+    # Convert similarity to distance: similar -> small distance, different -> large distance.
     return 1.0 - similarity
-
 
 def cosine_distance_matrix(
     track_features: List[np.ndarray],
