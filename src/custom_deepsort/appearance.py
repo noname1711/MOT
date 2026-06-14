@@ -166,7 +166,17 @@ def cosine_distance_matrix(
     detection_features: List[np.ndarray],
 ) -> np.ndarray:
     """
-    Build a cost matrix between track features and detection features.
+    Build an appearance cost matrix between tracks and detections.
+
+    Example:
+        2 tracks and 3 detections will create a 2x3 matrix:
+
+                    det_0   det_1   det_2
+            track_0  0.05    0.70    0.80
+            track_1  0.75    0.10    0.60
+
+        Smaller cost means more similar appearance.
+        So track_0 is closest to det_0 (cost 0.05), and track_1 is closest to det_1 (cost 0.10).
     """
     if len(track_features) == 0 or len(detection_features) == 0:
         return np.empty(
@@ -179,7 +189,8 @@ def cosine_distance_matrix(
         dtype=np.float32,
     )
 
-    # Each cell stores the appearance distance between one track and one detection.
+    # Fill each cell with cosine distance between one track and one detection.
+    # Example: cost[0, 1] compares track_0 with detection_1.
     for i, track_feature in enumerate(track_features):
         for j, det_feature in enumerate(detection_features):
             cost[i, j] = cosine_distance(track_feature, det_feature)
