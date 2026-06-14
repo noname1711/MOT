@@ -113,18 +113,26 @@ class KalmanFilter:
 
     def predict(self, mean: np.ndarray, covariance: np.ndarray):
         """
-        Predict the next state before seeing the current frame detection.
+        Predict the next track state before matching with current detections.
+
+        The prediction uses a constant-velocity model:
+            new_position = old_position + velocity
 
         Formula:
             x' = F x
             P' = F P F^T + Q
 
         where:
-            x: current state mean
-            P: current covariance
-            F: motion matrix
-            Q: motion noise covariance
-        """
+            x: current state mean [cx, cy, a, h, vx, vy, va, vh]
+            x': predicted state mean
+            P: current covariance, representing current uncertainty
+            P': predicted covariance, representing uncertainty after prediction
+            F: motion matrix that applies the constant-velocity model
+            Q: motion noise covariance for unpredictable movement
+
+        This step lets the tracker estimate where an object should be before
+        the detector result of the current frame is used.
+        """         
         # Scale process noise according to the current object height.
         h = max(float(mean[3]), 1.0)
 
@@ -209,16 +217,29 @@ class KalmanFilter:
         """
         Correct the predicted state using a matched detection.
 
+        The update step compares the predicted measurement with the actual
+        detection and uses the error to refine the track state.
+
         Formula:
             K = P H^T (H P H^T + R)^(-1)
             x_new = x + K (z - Hx)
             P_new = P - K S K^T
 
         where:
-            K: Kalman gain
-            z: detection measurement
-            Hx: predicted measurement
+            x: predicted state mean [cx, cy, a, h, vx, vy, va, vh]
+            x_new: updated state mean after using the matched detection
+            P: predicted covariance, representing prediction uncertainty
+            P_new: updated covariance after correction
+            K: Kalman gain, controlling how much to trust the detection
+            H: measurement matrix that maps the state to [cx, cy, a, h]
+            z: detection measurement [cx, cy, a, h]
+            Hx: predicted measurement in detection space
             z - Hx: innovation, or prediction error
+            R: measurement noise covariance
+            S: innovation covariance, S = H P H^T + R
+
+        This step pulls the predicted state closer to the matched detection
+        while keeping the track movement smooth.
         """
         # Convert the predicted state into measurement space.
         projected_mean, projected_cov = self.project(mean, covariance)
@@ -267,7 +288,8 @@ class KalmanFilter:
         # Mahalanobis distance:
         #   d^2 = (z - mean)^T S^(-1) (z - mean)
         #
-        # This is better than plain Euclidean distance because it considers
-        # the uncertainty of the prediction.
+        # z - mean is the prediction error.
+        # S^(-1) scales this error based on prediction uncertainty.
+        # Lower distance means the detection is more consistent with the prediction.
         return np.sum(d @ inv_cov * d, axis=1)
 

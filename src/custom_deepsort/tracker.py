@@ -37,19 +37,21 @@ class CustomDeepSORTTracker:
 
     def __init__(
         self,
-        max_age: int = 25,
-        n_init: int = 2,
-        max_cosine_distance: float = 0.50,
-        max_iou_distance: float = 0.72,
-        nn_budget=None,
-        appearance_matching: bool = True,
-        appearance_weight: float = 0.35,
-        iou_weight: float = 0.55,
-        motion_weight: float = 0.10,
-        max_combined_distance: float = 0.78,
-        max_motion_distance: float = 16.0,
-        min_box_area: int = 64,
-        max_predicted_age_to_output: int = 8,
+        max_age: int = 25,                 # Maximum frames to keep a track without a matched detection.
+        n_init: int = 2,                   # Number of successful matches needed to confirm a new track.
+        max_cosine_distance: float = 0.50, # Maximum appearance distance for matching.
+        max_iou_distance: float = 0.72,    # Maximum IoU-based distance for matching.
+        nn_budget=None,                    # Optional limit for stored appearance features.
+
+        appearance_matching: bool = True,  # Enable appearance-based matching.
+        appearance_weight: float = 0.35,   # Weight of appearance cost in combined matching.
+        iou_weight: float = 0.55,          # Weight of IoU cost in combined matching.
+        motion_weight: float = 0.10,       # Weight of motion cost in combined matching.
+
+        max_combined_distance: float = 0.78, # Maximum allowed combined matching cost.
+        max_motion_distance: float = 16.0,   # Normalization threshold for motion distance.
+        min_box_area: int = 64,              # Ignore detections with very small bounding boxes.
+        max_predicted_age_to_output: int = 8, # Maximum age for outputting predicted tracks.
     ):
         # Maximum number of missed frames before deleting a confirmed track.
         self.max_age = max_age
