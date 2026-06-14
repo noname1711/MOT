@@ -70,19 +70,21 @@ class AppearanceExtractor:
         )
 
         # Extract HSV color histogram.
+        # HSV uses H/S/V channels: color type, color intensity, and brightness.
         hsv_feature = self._hist_feature(
-            image=cv2.cvtColor(crop, cv2.COLOR_BGR2HSV),
-            channels=[0, 1, 2],
-            bins=self.hsv_bins,
-            ranges=[0, 180, 0, 256, 0, 256],
+            image=cv2.cvtColor(crop, cv2.COLOR_BGR2HSV),  # Convert crop from BGR to HSV.
+            channels=[0, 1, 2],                           # Use H, S, and V channels.
+            bins=self.hsv_bins,                           # Number of bins for each HSV channel.
+            ranges=[0, 180, 0, 256, 0, 256],              # OpenCV HSV ranges: H [0,180], S/V [0,256].
         )
 
         # Extract LAB color histogram.
+        # LAB uses L/A/B channels: lightness, green-red, and blue-yellow.
         lab_feature = self._hist_feature(
-            image=cv2.cvtColor(crop, cv2.COLOR_BGR2LAB),
-            channels=[0, 1, 2],
-            bins=self.lab_bins,
-            ranges=[0, 256, 0, 256, 0, 256],
+            image=cv2.cvtColor(crop, cv2.COLOR_BGR2LAB),  # Convert crop from BGR to LAB.
+            channels=[0, 1, 2],                           # Use L, A, and B channels.
+            bins=self.lab_bins,                           # Number of bins for each LAB channel.
+            ranges=[0, 256, 0, 256, 0, 256],              # OpenCV LAB channels use [0,256].
         )
 
         # Combine both color descriptors into one appearance vector.
