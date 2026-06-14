@@ -19,11 +19,16 @@ class AppearanceExtractor:
         hsv_bins=(8, 8, 4),
         lab_bins=(8, 8, 4),
     ):
-        # Fixed crop size used before extracting color histograms.
+        # Resize each object crop to a fixed size before feature extraction.
+        # Format: (width, height).
         self.output_size = output_size
 
-        # Number of histogram bins for HSV and LAB color spaces.
+        # HSV bins: (Hue, Saturation, Value).
+        # Hue = color type, Saturation = color intensity, Value = brightness.
         self.hsv_bins = hsv_bins
+
+        # LAB bins: (Lightness, A, B).
+        # Lightness = brightness, A = green-red, B = blue-yellow.
         self.lab_bins = lab_bins
 
     def extract(self, frame, detections: List[dict]) -> List[np.ndarray]:
