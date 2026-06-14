@@ -91,6 +91,13 @@ class AppearanceExtractor:
         feature = np.concatenate([hsv_feature, lab_feature]).astype(np.float32)
 
         # Normalize the final feature for cosine-distance comparison.
+        # Example:
+        #   Suppose the color histogram feature is [3, 4].
+        #   Its length is sqrt(3^2 + 4^2) = 5.
+        #   After normalization: [3, 4] / 5 = [0.6, 0.8].
+        #
+        # This keeps the color ratio but removes the effect of feature magnitude,
+        # making cosine-distance comparison more stable.
         norm = np.linalg.norm(feature)
         if norm > 0:
             feature = feature / norm
