@@ -13,8 +13,9 @@ class KalmanFilter:
 
     where:
         cx, cy: bounding box center
-        a: aspect ratio
+        a: aspect ratio (w/h)
         h: bounding box height
+        v: velocity of cx, cy, a, h
     """
 
     def __init__(self):
