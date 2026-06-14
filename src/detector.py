@@ -6,6 +6,7 @@ from ultralytics import YOLO
 from src.utils import VEHICLE_CLASS_IDS, VEHICLE_CLASS_NAMES
 
 
+# Lightweight wrapper that exposes YOLO detections in project format.
 class YOLODetector:
     """
     YOLOv5/Ultralytics wrapper for vehicle detection.
@@ -29,16 +30,20 @@ class YOLODetector:
         self.conf_threshold = conf_threshold
         self.image_size = image_size
         self.device = device
+        # Restrict detection to vehicle classes unless overridden.
         self.target_classes = target_classes or VEHICLE_CLASS_IDS
 
+        # Load the YOLO model once during detector initialization.
         self.model = YOLO(self.model_path)
 
+    # Run YOLO on one frame and return normalized detection dictionaries.
     def detect(self, frame) -> List[Dict[str, Any]]:
         if frame is None:
             return []
 
         frame_height, frame_width = frame.shape[:2]
 
+        # Perform model inference with confidence, class, and device settings.
         results = self.model.predict(
             source=frame,
             imgsz=self.image_size,
@@ -53,6 +58,7 @@ class YOLODetector:
         if not results:
             return detections
 
+        # Ultralytics stores predicted bounding boxes in results[0].boxes.
         boxes = results[0].boxes
 
         if boxes is None:
@@ -63,11 +69,13 @@ class YOLODetector:
             conf = float(box.conf[0].cpu().numpy())
             class_id = int(box.cls[0].cpu().numpy())
 
+            # Extra safety check in case the backend returns other classes.
             if class_id not in self.target_classes:
                 continue
 
             x1, y1, x2, y2 = xyxy
 
+            # Clamp box coordinates to the valid image region.
             x1 = int(max(0, min(frame_width - 1, x1)))
             y1 = int(max(0, min(frame_height - 1, y1)))
             x2 = int(max(0, min(frame_width - 1, x2)))
@@ -76,6 +84,7 @@ class YOLODetector:
             w = x2 - x1
             h = y2 - y1
 
+            # Ignore invalid boxes after clamping.
             if w <= 0 or h <= 0:
                 continue
 
@@ -89,6 +98,7 @@ class YOLODetector:
 
         return detections
 
+    # Draw raw detector outputs for debugging or detector-only visualization.
     def draw_detections(self, frame, detections: List[Dict[str, Any]]):
         output_frame = frame.copy()
 

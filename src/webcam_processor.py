@@ -18,6 +18,7 @@ from src.utils import (
 from src.visualizer import draw_hud
 
 
+# Real-time webcam processor backed by a worker thread.
 class WebcamProcessor:
     """
     Background-thread webcam processor.
@@ -38,6 +39,7 @@ class WebcamProcessor:
         self.camera_index = camera_index
         self.tracker_type = tracker_type
 
+        # The same frame pipeline is reused for live webcam frames.
         self.pipeline = VehicleTrackingPipeline(
             yolo_model_path=yolo_model_path,
             conf_threshold=conf_threshold,
@@ -49,6 +51,8 @@ class WebcamProcessor:
         self.cap = None
 
         # Thread state
+        # These fields are protected by self.lock because the worker and
+        # HTTP streaming route may access them at the same time.
         self.lock = threading.RLock()
         self.worker_thread: Optional[threading.Thread] = None
         self.running = False
@@ -56,6 +60,7 @@ class WebcamProcessor:
         self.latest_error: Optional[str] = None
 
         # Session metrics
+        # These values describe the current live webcam session.
         self.session_started_at = time.time()
         self.session_frame_count = 0
         self.session_track_ids = set()
@@ -66,6 +71,7 @@ class WebcamProcessor:
         self.last_frame_time = time.time()
 
         # Recording state
+        # These fields are active only while saving a webcam recording.
         self.is_recording = False
         self.record_writer = None
         self.record_temp_path = None
@@ -84,6 +90,7 @@ class WebcamProcessor:
     # Worker lifecycle
     # ============================================================
 
+    # Start the background loop that reads, tracks, and encodes frames.
     def start(self) -> Dict[str, Any]:
         """
         Start the background worker if it is not already running.
@@ -120,6 +127,7 @@ class WebcamProcessor:
             "message": "Webcam worker started.",
         }
 
+    # Stop the worker and release resources safely.
     def stop(self) -> Dict[str, Any]:
         """
         Stop the background worker and release the webcam.
@@ -143,6 +151,7 @@ class WebcamProcessor:
             "message": "Webcam worker stopped.",
         }
 
+    # Open the physical webcam and set a manageable resolution.
     def _open_camera(self) -> None:
         if self.cap is not None and self.cap.isOpened():
             return
@@ -155,6 +164,7 @@ class WebcamProcessor:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
+    # Release the webcam handle when processing stops.
     def _release_camera(self) -> None:
         if self.cap is not None:
             self.cap.release()
@@ -164,6 +174,7 @@ class WebcamProcessor:
     # Recording
     # ============================================================
 
+    # Start saving processed webcam frames and tracking rows.
     def start_recording(
         self,
         static_output_path: str,
@@ -226,6 +237,7 @@ class WebcamProcessor:
         with self.lock:
             return self._stop_recording_locked()
 
+    # Stop recording while the caller already holds self.lock.
     def _stop_recording_locked(self) -> Dict[str, Any]:
         if not self.is_recording:
             return {
@@ -294,6 +306,7 @@ class WebcamProcessor:
 
         return result
 
+    # Reset recording-related fields after recording ends or fails.
     def _clear_recording_state(self) -> None:
         self.record_temp_path = None
         self.record_static_path = None
@@ -304,6 +317,7 @@ class WebcamProcessor:
         self.record_track_ids = set()
         self.record_max_active_tracks = 0
 
+    # Write one processed frame and its tracking rows while locked.
     def _write_recording_frame_locked(self, frame, tracks) -> None:
         if not self.is_recording:
             return
@@ -346,6 +360,7 @@ class WebcamProcessor:
     # Metrics and stream
     # ============================================================
 
+    # Return lightweight metrics for the frontend webcam dashboard.
     def get_live_metrics(self) -> Dict[str, Any]:
         with self.lock:
             duration = time.time() - self.session_started_at
@@ -367,6 +382,7 @@ class WebcamProcessor:
                 "latest_error": self.latest_error,
             }
 
+    # Stream the latest processed JPEG frame as MJPEG chunks.
     def generate_frames(self):
         """
         Yield MJPEG frames for the /webcam_feed route.
@@ -401,6 +417,7 @@ class WebcamProcessor:
 
             time.sleep(0.03)
 
+    # Main background loop: read camera, run pipeline, update stream state.
     def _worker_loop(self) -> None:
         try:
             self._open_camera()
@@ -423,6 +440,7 @@ class WebcamProcessor:
                 live_fps = 1.0 / delta if delta > 0 else 0.0
                 self.last_frame_time = now
 
+                # Run detection, tracking, and visualization for this webcam frame.
                 result = self.pipeline.process_frame(frame, draw=True)
                 output_frame = result["frame"]
                 tracks = result["tracks"]
@@ -454,6 +472,7 @@ class WebcamProcessor:
                         "Record Frames": self.record_frame_count,
                     }
 
+                # Overlay live status information before streaming/recording.
                 output_frame = draw_hud(output_frame, hud)
 
                 with self.lock:
@@ -475,6 +494,7 @@ class WebcamProcessor:
             self._release_camera()
 
     @staticmethod
+    # Create a simple image shown while the camera is starting or failing.
     def _make_placeholder_frame(message: str):
         frame = np.full((360, 640, 3), 255, dtype=np.uint8)
 

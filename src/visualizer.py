@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 import cv2
 
 
+# Generate a deterministic color from a track ID.
 def get_track_color(track_id: str):
     try:
         value = int(track_id)
@@ -16,6 +17,7 @@ def get_track_color(track_id: str):
     return int(b), int(g), int(r)
 
 
+# Draw bounding boxes, IDs, and labels for tracked objects.
 def draw_tracks(frame, tracks: List[Dict[str, Any]]):
     output_frame = frame.copy()
 
@@ -28,6 +30,7 @@ def draw_tracks(frame, tracks: List[Dict[str, Any]]):
 
         color = get_track_color(track_id)
 
+        # Show class and confidence only when a real detection is matched.
         if visibility == 1:
             label = f"ID {track_id} | {class_name} {confidence:.2f}"
         else:
@@ -58,6 +61,7 @@ def draw_tracks(frame, tracks: List[Dict[str, Any]]):
     return output_frame
 
 
+# Draw simple key-value status text on top of a frame.
 def draw_hud(frame, items: Dict[str, Any]):
     output_frame = frame.copy()
 

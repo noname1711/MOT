@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple
 from src.utils import get_vehicle_class_name, read_tracking_txt
 
 
+# Compute IoU between two [x1, y1, x2, y2] boxes.
 def compute_iou(box_a: List[float], box_b: List[float]) -> float:
     ax1, ay1, ax2, ay2 = box_a
     bx1, by1, bx2, by2 = box_b
@@ -28,12 +29,14 @@ def compute_iou(box_a: List[float], box_b: List[float]) -> float:
     return inter_area / union
 
 
+# Analyze exported tracking rows without requiring ground truth.
 def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str, Any]:
     records = read_tracking_txt(tracking_txt_path)
 
     if fps <= 0:
         fps = 25.0
 
+    # Group all TXT rows by predicted track ID.
     tracks = defaultdict(list)
 
     for item in records:
@@ -49,11 +52,13 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
         frames = [int(x["frame"]) for x in items]
         confs = [float(x["confidence"]) for x in items]
 
+        # Visible rows are backed by an actual detection.
         visible_items = [
             x for x in items
             if int(x["visibility"]) == 1 and int(x["class_id"]) != -1
         ]
 
+        # Predicted rows are produced by tracker prediction only.
         predicted_items = [
             x for x in items
             if int(x["visibility"]) == 0 or int(x["class_id"]) == -1
@@ -101,6 +106,7 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
 
     track_lengths = [item["frames_tracked"] for item in track_summaries]
 
+    # Short tracks are useful for spotting unstable or noisy IDs.
     short_tracks = [
         length for length in track_lengths
         if length <= max(3, int(fps * 0.5))
@@ -132,6 +138,7 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
     }
 
 
+# Build metrics for videos without ground-truth annotations.
 def build_upload_metrics(
     tracking_txt_path: str,
     process_info: Dict[str, Any],
@@ -184,6 +191,7 @@ def build_upload_metrics(
     }
 
 
+# Evaluate predictions against ground truth using greedy IoU matching.
 def evaluate_with_ground_truth(
     ground_truth_records: List[Dict[str, Any]],
     prediction_records: List[Dict[str, Any]],
@@ -210,6 +218,7 @@ def evaluate_with_ground_truth(
         Higher MOTP proxy means better bounding-box localization quality.
     """
 
+    # Group ground-truth and prediction boxes by frame for matching.
     gt_by_frame = defaultdict(list)
     pred_by_frame = defaultdict(list)
 
@@ -234,6 +243,7 @@ def evaluate_with_ground_truth(
         total_gt += len(gt_items)
         total_pred += len(pred_items)
 
+        # Candidate matches must pass the IoU threshold.
         candidate_pairs = []
 
         for gi, gt in enumerate(gt_items):
@@ -243,6 +253,7 @@ def evaluate_with_ground_truth(
                 if iou >= iou_threshold:
                     candidate_pairs.append((iou, gi, pi))
 
+        # Greedily match highest-IoU pairs first.
         candidate_pairs.sort(reverse=True, key=lambda x: x[0])
 
         used_gt = set()
@@ -267,6 +278,7 @@ def evaluate_with_ground_truth(
 
     true_positive = len(matches)
 
+    # Standard detection-style precision, recall, and F1 scores.
     precision = true_positive / total_pred if total_pred else 0
     recall = true_positive / total_gt if total_gt else 0
 
@@ -285,6 +297,7 @@ def evaluate_with_ground_truth(
         else 0
     )
 
+    # Count predicted ID changes for the same ground-truth object.
     id_switches = _count_id_switches(matches)
 
     mota_proxy = (
@@ -310,6 +323,7 @@ def evaluate_with_ground_truth(
     }
 
 
+# Build full dataset metrics when ground truth is available.
 def build_dataset_metrics(
     dataset_name: str,
     ground_truth_records: List[Dict[str, Any]],
@@ -364,6 +378,7 @@ def build_dataset_metrics(
     }
 
 
+# Pick the most frequent non-predicted class for one track.
 def _get_main_class_id(records: List[Dict[str, Any]]) -> int:
     counts = defaultdict(int)
 
@@ -381,6 +396,7 @@ def _get_main_class_id(records: List[Dict[str, Any]]) -> int:
     return max(counts, key=counts.get)
 
 
+# Count ID switches from matched ground-truth/predicted ID pairs.
 def _count_id_switches(matches: List[Tuple[int, str, str, float]]) -> int:
     by_gt_id = defaultdict(list)
 

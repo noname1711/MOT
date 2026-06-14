@@ -8,9 +8,11 @@ from typing import Any, Dict, List
 from src.utils import get_video_info
 
 
+# Default folder that stores all vehicle-tracking datasets.
 DATASET_ROOT = "data/vehicle_tracking"
 
 
+# Discover all available dataset folders.
 def list_datasets(dataset_root: str = DATASET_ROOT) -> List[Dict[str, Any]]:
     root = Path(dataset_root)
 
@@ -29,12 +31,14 @@ def list_datasets(dataset_root: str = DATASET_ROOT) -> List[Dict[str, Any]]:
     return datasets
 
 
+# Collect video, ground-truth, and metadata paths for one dataset.
 def get_dataset_info(dataset_name: str, dataset_root: str = DATASET_ROOT) -> Dict[str, Any]:
     dataset_dir = Path(dataset_root) / dataset_name
 
     if not dataset_dir.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_name}")
 
+    # Locate expected dataset files by naming convention.
     original_videos = list(dataset_dir.glob("*_Original-video.mp4"))
     gt_videos = list(dataset_dir.glob("*_GroundTruth-video.mp4"))
     gt_json_files = list(dataset_dir.glob("*_GroundTruth.json"))
@@ -60,6 +64,7 @@ def get_dataset_info(dataset_name: str, dataset_root: str = DATASET_ROOT) -> Dic
     }
 
 
+# Load ground truth from TXT first, then fall back to JSON.
 def load_ground_truth_records(dataset_info: Dict[str, Any]) -> List[Dict[str, Any]]:
     txt_path = dataset_info.get("groundtruth_txt_path")
     json_path = dataset_info.get("groundtruth_json_path")
@@ -75,6 +80,7 @@ def load_ground_truth_records(dataset_info: Dict[str, Any]) -> List[Dict[str, An
     return []
 
 
+# Parse TXT annotations into a unified ground-truth record format.
 def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
     """
     Parse GroundTruth.txt files with flexible input formats.
@@ -94,6 +100,7 @@ def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
         return records
 
     first_line = lines[0]
+    # Detect whether the TXT file has a CSV header row.
     has_header = bool(re.search(r"[a-zA-Z]", first_line))
 
     if has_header:
@@ -107,6 +114,7 @@ def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
 
         return records
 
+    # Headerless files are parsed as comma- or space-separated numbers.
     for line in lines:
         parts = re.split(r"[,\s]+", line.strip())
         nums = []
@@ -135,12 +143,14 @@ def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
     return records
 
 
+# Parse JSON annotations even when boxes are nested inside lists/dicts.
 def parse_ground_truth_json(json_path: str) -> List[Dict[str, Any]]:
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     raw_items: List[Dict[str, Any]] = []
 
+    # Recursively collect objects that look like frame-level annotations.
     def walk(obj):
         if isinstance(obj, list):
             for item in obj:
@@ -209,6 +219,7 @@ def parse_ground_truth_json(json_path: str) -> List[Dict[str, Any]]:
     return records
 
 
+# Normalize one CSV row into the common ground-truth schema.
 def _normalize_gt_row(row: Dict[str, Any]) -> Dict[str, Any] | None:
     frame_key = _find_key(row, ["frame", "frame_id", "frameId"])
     id_key = _find_key(row, ["id", "track_id", "trackId"])
@@ -237,6 +248,7 @@ def _normalize_gt_row(row: Dict[str, Any]) -> Dict[str, Any] | None:
         return None
 
 
+# Find a column name while ignoring case and naming variations.
 def _find_key(row: Dict[str, Any], candidates: List[str]) -> str | None:
     lowered = {key.lower(): key for key in row.keys()}
 
@@ -247,6 +259,7 @@ def _find_key(row: Dict[str, Any], candidates: List[str]) -> str | None:
     return None
 
 
+# Build one normalized ground-truth record with both bbox formats.
 def _build_gt_record(frame: int, track_id: str, x: float, y: float, w: float, h: float) -> Dict[str, Any]:
     return {
         "frame": int(frame),
@@ -260,6 +273,7 @@ def _build_gt_record(frame: int, track_id: str, x: float, y: float, w: float, h:
     }
 
 
+# Compute simple dataset statistics from ground-truth boxes.
 def summarize_ground_truth(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not records:
         return {

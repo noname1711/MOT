@@ -5,6 +5,7 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 from src.custom_deepsort import CustomDeepSORTTracker
 
 
+# Adapter that makes deep-sort-realtime output match the project format.
 class DeepSORTTracker:
     """
     Wrapper around the original deep-sort-realtime tracker.
@@ -20,6 +21,7 @@ class DeepSORTTracker:
         max_cosine_distance: float = 0.4,
         nn_budget=None
     ):
+        # Use MobileNet embedder as the original DeepSORT baseline.
         self.tracker = DeepSort(
             max_age=max_age,
             n_init=n_init,
@@ -31,12 +33,14 @@ class DeepSORTTracker:
             embedder_gpu=False
         )
 
+    # Update DeepSORT with YOLO detections from one frame.
     def update(self, detections: List[Dict[str, Any]], frame) -> List[Dict[str, Any]]:
         if frame is None:
             return []
 
         frame_height, frame_width = frame.shape[:2]
 
+        # Convert project detections into deep-sort-realtime input format.
         deepsort_detections = []
 
         for det in detections:
@@ -51,6 +55,7 @@ class DeepSORTTracker:
                 str(det["class_name"])
             ))
 
+        # The library handles Re-ID, Kalman prediction, and association.
         raw_tracks = self.tracker.update_tracks(
             deepsort_detections,
             frame=frame
@@ -59,6 +64,7 @@ class DeepSORTTracker:
         tracks: List[Dict[str, Any]] = []
 
         for track in raw_tracks:
+            # Only expose confirmed tracks to reduce noisy IDs.
             if not track.is_confirmed():
                 continue
 
@@ -79,6 +85,7 @@ class DeepSORTTracker:
 
             track_bbox = [x1, y1, x2, y2]
 
+            # Recover class/confidence by matching the track box to YOLO detections.
             matched_detection = self._find_best_detection_for_track(
                 track_bbox_xyxy=track_bbox,
                 detections=detections,
@@ -112,6 +119,7 @@ class DeepSORTTracker:
         return tracks
 
     @staticmethod
+    # Find the YOLO detection that overlaps a track box the most.
     def _find_best_detection_for_track(
         track_bbox_xyxy: List[int],
         detections: List[Dict[str, Any]],
@@ -136,6 +144,7 @@ class DeepSORTTracker:
         return matched
 
     @staticmethod
+    # Compute spatial overlap between two boxes.
     def compute_iou(box_a: List[float], box_b: List[float]) -> float:
         ax1, ay1, ax2, ay2 = box_a
         bx1, by1, bx2, by2 = box_b
@@ -160,6 +169,7 @@ class DeepSORTTracker:
         return inter_area / union_area
 
 
+# Factory function used by the pipeline to choose a tracker implementation.
 def create_tracker(
     tracker_type: str = "deepsort",
     max_age: int = 30,

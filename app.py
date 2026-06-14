@@ -37,10 +37,15 @@ from src.compare import compare_dataset_trackers, compare_upload_trackers
 
 app = Flask(__name__)
 
+# Global path configuration used by all application modes.
+# uploads/ stores user-uploaded videos.
+# static/outputs/ stores browser-playable videos.
+# results/ stores downloadable videos, TXT files, and metric JSON files.
 UPLOAD_FOLDER = "uploads"
 STATIC_OUTPUT_ROOT = "static/outputs"
 RESULT_ROOT = "results"
 
+# Default model/runtime configuration shared by dataset, upload, and webcam modes.
 MODEL_PATH = "models/yolov5n.pt"
 CONF_THRESHOLD = 0.35
 IMAGE_SIZE = 416
@@ -48,6 +53,8 @@ DEVICE = "cpu"
 
 VEHICLE_MODEL_NAME = "YOLOv5n + DeepSORT/Custom DeepSORT Vehicle Tracking"
 
+# Tracker options shown in the UI.
+# "compare" is a UI mode that runs both trackers on the same input.
 TRACKER_OPTIONS = [
     {
         "value": "deepsort",
@@ -66,6 +73,7 @@ TRACKER_OPTIONS = [
     },
 ]
 
+# Webcam mode supports one active tracker at a time.
 DEFAULT_WEBCAM_TRACKER = "deepsort"
 WEBCAM_TRACKER_OPTIONS = [
     item for item in TRACKER_OPTIONS
@@ -74,11 +82,15 @@ WEBCAM_TRACKER_OPTIONS = [
 
 MODES = ["dataset", "upload", "webcam", "compare"]
 
+# Singleton webcam processor.
+# Keeping one instance avoids opening the same webcam multiple times.
 webcam_processor = None
 
+# Metadata for the most recent webcam recording.
+# Used after recording stops to build download URLs and metrics.
 latest_webcam_recording = {
     "run_id": None,
-    "filename": None,  
+    "filename": None,
     "txt_filename": None,
     "static_path": None,
     "result_path": None,
@@ -88,16 +100,19 @@ latest_webcam_recording = {
 }
 
 
+# Create all directories required by the application before Flask starts.
 def init_directories():
     ensure_dir(UPLOAD_FOLDER)
 
     for mode in MODES:
+        # Each mode has a static output directory and three result directories.
         ensure_dir(os.path.join(STATIC_OUTPUT_ROOT, mode))
         ensure_dir(os.path.join(RESULT_ROOT, mode, "videos"))
         ensure_dir(os.path.join(RESULT_ROOT, mode, "txt"))
         ensure_dir(os.path.join(RESULT_ROOT, mode, "metrics"))
 
 
+# Normalize tracker names coming from forms, query strings, or frontend JSON.
 def normalize_webcam_tracker(tracker_type: str | None = None) -> str:
     normalized = str(tracker_type or DEFAULT_WEBCAM_TRACKER).strip().lower()
 
@@ -107,6 +122,7 @@ def normalize_webcam_tracker(tracker_type: str | None = None) -> str:
     return "deepsort"
 
 
+# Return the currently active webcam tracker type.
 def get_current_webcam_tracker_type() -> str:
     if webcam_processor is None:
         return DEFAULT_WEBCAM_TRACKER
@@ -116,9 +132,12 @@ def get_current_webcam_tracker_type() -> str:
     )
 
 
+# Get or create the singleton WebcamProcessor.
+# If the requested tracker changes and recording is not active, restart the worker.
 def get_webcam_processor(tracker_type: str | None = None) -> WebcamProcessor:
     global webcam_processor
 
+    # Resolve the requested tracker; if none is given, keep the current one.
     selected_tracker = normalize_webcam_tracker(
         tracker_type or get_current_webcam_tracker_type()
     )
@@ -129,6 +148,7 @@ def get_webcam_processor(tracker_type: str | None = None) -> WebcamProcessor:
         )
 
         if current_tracker != selected_tracker:
+            # Do not switch tracker while recording, otherwise output files may mix trackers.
             live_info = webcam_processor.get_live_metrics()
 
             if not live_info.get("is_recording"):
@@ -150,6 +170,7 @@ def get_webcam_processor(tracker_type: str | None = None) -> WebcamProcessor:
     return webcam_processor
 
 
+# Factory helper for file-based video processing.
 def create_video_processor(tracker_type: str = "deepsort") -> VideoProcessor:
     return VideoProcessor(
         yolo_model_path=MODEL_PATH,
@@ -160,6 +181,7 @@ def create_video_processor(tracker_type: str = "deepsort") -> VideoProcessor:
     )
 
 
+# Resolve the directory for downloadable result artifacts.
 def get_result_dir(mode: str, kind: str) -> str:
     if mode not in MODES:
         raise ValueError(f"Invalid mode: {mode}")
@@ -170,6 +192,7 @@ def get_result_dir(mode: str, kind: str) -> str:
     return os.path.join(RESULT_ROOT, mode, kind)
 
 
+# Resolve the directory for browser-playable output videos.
 def get_static_output_dir(mode: str) -> str:
     if mode not in MODES:
         raise ValueError(f"Invalid mode: {mode}")
@@ -177,6 +200,7 @@ def get_static_output_dir(mode: str) -> str:
     return os.path.join(STATIC_OUTPUT_ROOT, mode)
 
 
+# Convert an internal tracker key into a human-readable UI label.
 def get_tracker_label(tracker_type: str) -> str:
     tracker_type = str(tracker_type).strip().lower()
 
@@ -187,6 +211,7 @@ def get_tracker_label(tracker_type: str) -> str:
     return tracker_type
 
 
+# Read and validate the tracker selected from a submitted HTML form.
 def get_selected_tracker(default: str = "deepsort") -> str:
     tracker_type = request.form.get("tracker_type", default).strip().lower()
 
@@ -198,6 +223,8 @@ def get_selected_tracker(default: str = "deepsort") -> str:
     return tracker_type
 
 
+# Read an optional frame limit from the form.
+# Invalid, empty, or non-positive values are treated as no limit.
 def get_optional_max_frames():
     raw_value = request.form.get("max_frames", "").strip()
 
@@ -215,10 +242,12 @@ def get_optional_max_frames():
     return value
 
 
+# Convert comparison summary data into the structure expected by HTML templates.
 def build_compare_template_result(summary: dict) -> dict:
     rows = []
 
     for row in summary.get("comparison", []):
+        # Copy row data before adding template-only URLs and filenames.
         item = dict(row)
 
         video_name = os.path.basename(str(row.get("video_path", "")))
@@ -275,6 +304,7 @@ def build_compare_template_result(summary: dict) -> dict:
     }
 
 
+# Home page.
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -284,6 +314,7 @@ def index():
 # Dataset mode
 # ============================================================
 
+# Dataset mode: run tracking on prepared dataset videos and evaluate with ground truth.
 @app.route("/dataset", methods=["GET", "POST"])
 def dataset_page():
     datasets = list_datasets()
@@ -297,6 +328,7 @@ def dataset_page():
         max_frames = get_optional_max_frames()
 
         if not dataset_name:
+            # Stop early when the user submits the form without choosing a dataset.
             error = "No dataset was selected."
             return render_template(
                 "dataset.html",
@@ -309,6 +341,7 @@ def dataset_page():
 
         try:
             if selected_tracker == "compare":
+                # Compare mode runs both original and custom trackers on the same dataset.
                 summary = compare_dataset_trackers(
                     dataset_name=dataset_name,
                     yolo_model_path=MODEL_PATH,
@@ -325,6 +358,7 @@ def dataset_page():
                 })
 
             else:
+                # Single-tracker mode: process once, then evaluate with ground truth.
                 dataset_info = get_dataset_info(dataset_name)
                 input_video_path = dataset_info.get("original_video_path")
 
@@ -366,6 +400,7 @@ def dataset_page():
                 ground_truth_records = load_ground_truth_records(dataset_info)
 
                 if max_frames is not None:
+                    # Keep ground truth aligned with the processed frame range.
                     ground_truth_records = [
                         item for item in ground_truth_records
                         if int(item["frame"]) <= int(max_frames)
@@ -451,6 +486,7 @@ def dataset_page():
 # Upload mode
 # ============================================================
 
+# Upload mode: run tracking on a user-uploaded video.
 @app.route("/upload", methods=["GET", "POST"])
 def upload_video():
     result = None
@@ -462,6 +498,7 @@ def upload_video():
         max_frames = get_optional_max_frames()
 
         if "video" not in request.files:
+            # The upload form did not contain a video field.
             error = "No video file was found in the request."
             return render_template(
                 "upload.html",
@@ -494,6 +531,7 @@ def upload_video():
             )
 
         try:
+            # Sanitize the original filename before storing it on disk.
             original_filename = secure_filename(file.filename)
             run_id = f"{timestamp_now()}_{Path(original_filename).stem}"
 
@@ -502,6 +540,7 @@ def upload_video():
             file.save(input_path)
 
             if selected_tracker == "compare":
+                # Compare mode runs both trackers on the uploaded video.
                 summary = compare_upload_trackers(
                     input_video_path=input_path,
                     run_name=Path(original_filename).stem,
@@ -622,6 +661,7 @@ def upload_video():
 # Webcam mode
 # ============================================================
 
+# Webcam page: start or reuse the webcam worker and render the live page.
 @app.route("/webcam")
 def webcam():
     selected_tracker = normalize_webcam_tracker(
@@ -629,6 +669,7 @@ def webcam():
     )
 
     processor = get_webcam_processor(tracker_type=selected_tracker)
+    # Ensure the worker is running before rendering the webcam page.
     processor.start()
 
     return render_template(
@@ -639,6 +680,7 @@ def webcam():
     )
 
 
+# MJPEG stream endpoint consumed by the browser webcam preview.
 @app.route("/webcam_feed")
 def webcam_feed():
     processor = get_webcam_processor()
@@ -649,12 +691,14 @@ def webcam_feed():
     )
 
 
+# Lightweight JSON endpoint for live webcam statistics.
 @app.route("/webcam/metrics")
 def webcam_metrics():
     processor = get_webcam_processor()
     return jsonify(processor.get_live_metrics())
 
 
+# Start or restart the webcam worker from the frontend.
 @app.route("/webcam/start_worker", methods=["POST"])
 def webcam_start_worker():
     """
@@ -679,6 +723,7 @@ def webcam_start_worker():
     return jsonify(info)
 
 
+# Stop the webcam worker and finalize recording if needed.
 @app.route("/webcam/stop_worker", methods=["POST"])
 def webcam_stop_worker():
     """
@@ -693,6 +738,7 @@ def webcam_stop_worker():
     recording_result = None
 
     if live_info.get("is_recording"):
+        # Finalize the recording before stopping the camera worker.
         stop_record_info = processor.stop_recording()
 
         if stop_record_info.get("success"):
@@ -710,6 +756,7 @@ def webcam_stop_worker():
     })
 
 
+# Start recording the live webcam stream to video and TXT tracking output.
 @app.route("/webcam/start_record", methods=["POST"])
 def webcam_start_record():
     global latest_webcam_recording
@@ -720,6 +767,7 @@ def webcam_start_record():
     )
     tracker_label = get_tracker_label(tracker_type)
 
+    # Use one run ID for the video, TXT file, and metrics JSON.
     run_id = f"{timestamp_now()}_webcam_{tracker_type}"
     output_video_name = f"{run_id}_tracking.mp4"
     output_txt_name = f"{run_id}_tracking.txt"
@@ -768,6 +816,7 @@ def webcam_start_record():
     })
 
 
+# Stop the current webcam recording and save its metrics.
 @app.route("/webcam/stop_record", methods=["POST"])
 def webcam_stop_record():
     processor = get_webcam_processor()
@@ -779,6 +828,7 @@ def webcam_stop_record():
     return jsonify(_save_webcam_recording_metrics(info))
 
 
+# Build and save metrics after a webcam recording finishes.
 def _save_webcam_recording_metrics(info):
     """
     Save metrics for a completed webcam recording session.
@@ -801,6 +851,7 @@ def _save_webcam_recording_metrics(info):
 
     tracking_txt_path = info["txt_output_path"]
 
+    # Analyze the saved tracking TXT to summarize the webcam recording.
     tracking_stats = analyze_tracking_txt(
         tracking_txt_path=tracking_txt_path,
         fps=float(info.get("fps", 20.0)),
@@ -873,16 +924,19 @@ def _save_webcam_recording_metrics(info):
 # Results
 # ============================================================
 
+# Results page: list generated videos, TXT files, and metric JSON files.
 @app.route("/results")
 def results_page():
     grouped_results = {}
 
     for mode in MODES:
+        # Build one grouped result list for each application mode.
         grouped_results[mode] = _group_result_runs(mode)
 
     return render_template("results.html", results=grouped_results)
 
 
+# Group files belonging to the same run ID so the UI can show them as one row.
 def _group_result_runs(mode: str):
     """
     Group result artifacts by run ID for dataset, upload, webcam, and compare modes.
@@ -904,6 +958,7 @@ def _group_result_runs(mode: str):
     }
 
     for kind, suffix in kind_to_suffix.items():
+        # Scan videos, TXT files, and metric files separately.
         directory = get_result_dir(mode, kind)
         files = _list_files(directory)
 
@@ -914,6 +969,7 @@ def _group_result_runs(mode: str):
                 continue
 
             if run_id not in grouped:
+                # Create a new grouped run entry the first time this run ID appears.
                 grouped[run_id] = {
                     "run_id": run_id,
                     "mode": mode,
@@ -956,6 +1012,7 @@ def _group_result_runs(mode: str):
     valid_runs = []
 
     for run in grouped.values():
+        # Hide incomplete runs that do not have a video or metrics file.
         has_video = run.get("video") is not None
         has_metrics = run.get("metrics") is not None
 
@@ -971,6 +1028,7 @@ def _group_result_runs(mode: str):
     )
 
 
+# Remove a known suffix to recover the run ID from an artifact filename.
 def _extract_run_id(filename: str, suffix: str):
     if not filename.endswith(suffix):
         return None
@@ -978,6 +1036,7 @@ def _extract_run_id(filename: str, suffix: str):
     return filename[:-len(suffix)]
 
 
+# Convert the timestamp prefix of a run ID into a readable time string.
 def _format_run_time(run_id: str) -> str:
     if len(run_id) < 15:
         return run_id
@@ -999,6 +1058,7 @@ def _format_run_time(run_id: str) -> str:
     return f"{yyyy}-{mm}-{dd} {hh}:{mi}:{ss}"
 
 
+# Extract the user-facing name part from a run ID.
 def _format_run_name(run_id: str) -> str:
     parts = run_id.split("_", 2)
 
@@ -1012,10 +1072,12 @@ def _format_run_name(run_id: str) -> str:
 # Download
 # ============================================================
 
+# Download endpoint for result videos, tracking TXT files, and metrics JSON files.
 @app.route("/download/<mode>/<kind>/<filename>")
 def download_file(mode, kind, filename):
     directory = get_result_dir(mode, kind)
 
+    # Flask safely serves the requested file from the selected result directory.
     return send_from_directory(
         directory,
         filename,
@@ -1023,6 +1085,7 @@ def download_file(mode, kind, filename):
     )
 
 
+# Return regular files in newest-first order for the results page.
 def _list_files(directory: str):
     if not os.path.exists(directory):
         return []
@@ -1038,6 +1101,7 @@ def _list_files(directory: str):
     return files
 
 
+# Entry point for local development.
 if __name__ == "__main__":
     init_directories()
 
