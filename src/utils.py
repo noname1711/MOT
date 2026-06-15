@@ -8,10 +8,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 
-# COCO class IDs used by this project for vehicle detection.
 VEHICLE_CLASS_IDS = [2, 3, 5, 7]
 
-# Mapping from class IDs to readable labels used in outputs.
 VEHICLE_CLASS_NAMES = {
     2: "car",
     3: "motorcycle",
@@ -23,29 +21,27 @@ VEHICLE_CLASS_NAMES = {
 ALLOWED_VIDEO_EXTENSIONS = {"mp4", "avi", "mov", "mkv"}
 
 
-# Create a directory if needed and return its string path.
 def ensure_dir(path: str | Path) -> str:
     path = str(path)
     os.makedirs(path, exist_ok=True)
     return path
 
 
-# Build timestamp strings for unique output file names.
 def timestamp_now() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
-# Validate uploaded video file extensions.
 def allowed_video_file(filename: str) -> bool:
+    # Example:
+    #   "traffic.mp4" -> extension "mp4" -> True
+    #   "notes.txt"   -> extension "txt" -> False
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
 
 
-# Convert numeric class IDs to readable names.
 def get_vehicle_class_name(class_id: int) -> str:
     return VEHICLE_CLASS_NAMES.get(int(class_id), f"class_{class_id}")
 
 
-# Save dictionaries as UTF-8 formatted JSON files.
 def save_json(data: Dict[str, Any], output_path: str) -> str:
     ensure_dir(os.path.dirname(output_path))
 
@@ -81,7 +77,6 @@ def safe_copy(src: str, dst: str) -> str:
     return dst
 
 
-# Convert OpenCV output videos into browser-friendly H.264 MP4.
 def convert_video_to_h264(input_path: str, output_path: str) -> None:
     """
     Convert a video to H.264 for stable browser playback.
@@ -115,7 +110,6 @@ def convert_video_to_h264(input_path: str, output_path: str) -> None:
         safe_copy(input_path, output_path)
 
 
-# Read basic metadata from a video file using OpenCV.
 def get_video_info(video_path: str) -> Dict[str, Any]:
     import cv2
 
@@ -134,6 +128,8 @@ def get_video_info(video_path: str) -> Dict[str, Any]:
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    # Example:
+    #   total_frames=250, fps=25 -> duration_sec=10 seconds.
     duration_sec = total_frames / fps if fps > 0 else 0
 
     cap.release()
@@ -148,7 +144,6 @@ def get_video_info(video_path: str) -> Dict[str, Any]:
     }
 
 
-# Read exported tracking TXT rows back into dictionaries.
 def read_tracking_txt(tracking_txt_path: str) -> List[Dict[str, Any]]:
     """
     Read tracking records from a CSV-style TXT file.
@@ -172,6 +167,8 @@ def read_tracking_txt(tracking_txt_path: str) -> List[Dict[str, Any]]:
                 w = float(row["w"])
                 h = float(row["h"])
 
+                # Convert [x,y,w,h] to [x1,y1,x2,y2].
+                # Example: [100,50,80,40] -> [100,50,180,90].
                 records.append({
                     "frame": int(float(row["frame"])),
                     "track_id": str(row["id"]),
@@ -191,7 +188,6 @@ def read_tracking_txt(tracking_txt_path: str) -> List[Dict[str, Any]]:
     return records
 
 
-# Write the standard tracking TXT header.
 def write_tracking_header(csv_writer) -> None:
     csv_writer.writerow([
         "frame",
@@ -206,11 +202,12 @@ def write_tracking_header(csv_writer) -> None:
     ])
 
 
-# Write all tracks from one frame to the tracking TXT file.
 def write_tracking_rows(csv_writer, frame_id: int, tracks: List[Dict[str, Any]]) -> None:
     for track in tracks:
         x, y, w, h = track["bbox_xywh"]
 
+        # Write one MOT-like row.
+        # Example: frame,id,x,y,w,h,conf,class,visibility = 1,5,100,50,80,40,0.8234,2,1
         csv_writer.writerow([
             frame_id,
             track["track_id"],

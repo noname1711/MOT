@@ -8,11 +8,9 @@ from typing import Any, Dict, List
 from src.utils import get_video_info
 
 
-# Default folder that stores all vehicle-tracking datasets.
 DATASET_ROOT = "data/vehicle_tracking"
 
 
-# Discover all available dataset folders.
 def list_datasets(dataset_root: str = DATASET_ROOT) -> List[Dict[str, Any]]:
     root = Path(dataset_root)
 
@@ -31,14 +29,12 @@ def list_datasets(dataset_root: str = DATASET_ROOT) -> List[Dict[str, Any]]:
     return datasets
 
 
-# Collect video, ground-truth, and metadata paths for one dataset.
 def get_dataset_info(dataset_name: str, dataset_root: str = DATASET_ROOT) -> Dict[str, Any]:
     dataset_dir = Path(dataset_root) / dataset_name
 
     if not dataset_dir.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_name}")
 
-    # Locate expected dataset files by naming convention.
     original_videos = list(dataset_dir.glob("*_Original-video.mp4"))
     gt_videos = list(dataset_dir.glob("*_GroundTruth-video.mp4"))
     gt_json_files = list(dataset_dir.glob("*_GroundTruth.json"))
@@ -64,7 +60,6 @@ def get_dataset_info(dataset_name: str, dataset_root: str = DATASET_ROOT) -> Dic
     }
 
 
-# Load ground truth from TXT first, then fall back to JSON.
 def load_ground_truth_records(dataset_info: Dict[str, Any]) -> List[Dict[str, Any]]:
     txt_path = dataset_info.get("groundtruth_txt_path")
     json_path = dataset_info.get("groundtruth_json_path")
@@ -80,7 +75,6 @@ def load_ground_truth_records(dataset_info: Dict[str, Any]) -> List[Dict[str, An
     return []
 
 
-# Parse TXT annotations into a unified ground-truth record format.
 def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
     """
     Parse GroundTruth.txt files with flexible input formats.
@@ -100,7 +94,11 @@ def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
         return records
 
     first_line = lines[0]
-    # Detect whether the TXT file has a CSV header row.
+
+    # Detect a header by checking whether the first line contains letters.
+    # Example:
+    #   "frame,id,x,y,w,h" -> has_header = True
+    #   "1,5,100,50,80,40" -> has_header = False
     has_header = bool(re.search(r"[a-zA-Z]", first_line))
 
     if has_header:
@@ -114,7 +112,11 @@ def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
 
         return records
 
-    # Headerless files are parsed as comma- or space-separated numbers.
+    # Parse headerless MOT-like rows.
+    # Example line:
+    #   "1,5,100,50,80,40,1.0,-1,-1,-1"
+    # means:
+    #   frame=1, track_id=5, bbox=[x=100, y=50, w=80, h=40]
     for line in lines:
         parts = re.split(r"[,\s]+", line.strip())
         nums = []
@@ -128,6 +130,10 @@ def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
         if len(nums) < 6:
             continue
 
+        # Use the first 6 values: frame, id, x, y, w, h.
+        # Example:
+        #   nums[:6] = [1, 5, 100, 50, 80, 40]
+        #   -> frame=1, id=5, bbox=[100,50,80,40]
         frame = int(nums[0])
         track_id = str(int(nums[1]))
         x = float(nums[2])
@@ -143,14 +149,12 @@ def parse_ground_truth_txt(txt_path: str) -> List[Dict[str, Any]]:
     return records
 
 
-# Parse JSON annotations even when boxes are nested inside lists/dicts.
 def parse_ground_truth_json(json_path: str) -> List[Dict[str, Any]]:
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     raw_items: List[Dict[str, Any]] = []
 
-    # Recursively collect objects that look like frame-level annotations.
     def walk(obj):
         if isinstance(obj, list):
             for item in obj:
@@ -192,6 +196,10 @@ def parse_ground_truth_json(json_path: str) -> List[Dict[str, Any]]:
                 h = bbox.get("h", bbox.get("height"))
 
                 if w is None or h is None:
+                    # Some JSON boxes store bottom-right coordinates instead of width/height.
+                    # Example:
+                    #   x=100, xmax=180 -> w=180-100=80
+                    #   y=50,  ymax=90  -> h=90-50=40
                     xmax = float(bbox.get("xmax", bbox.get("right", 0)))
                     ymax = float(bbox.get("ymax", bbox.get("bottom", 0)))
                     w = xmax - x
@@ -219,7 +227,6 @@ def parse_ground_truth_json(json_path: str) -> List[Dict[str, Any]]:
     return records
 
 
-# Normalize one CSV row into the common ground-truth schema.
 def _normalize_gt_row(row: Dict[str, Any]) -> Dict[str, Any] | None:
     frame_key = _find_key(row, ["frame", "frame_id", "frameId"])
     id_key = _find_key(row, ["id", "track_id", "trackId"])
@@ -248,7 +255,6 @@ def _normalize_gt_row(row: Dict[str, Any]) -> Dict[str, Any] | None:
         return None
 
 
-# Find a column name while ignoring case and naming variations.
 def _find_key(row: Dict[str, Any], candidates: List[str]) -> str | None:
     lowered = {key.lower(): key for key in row.keys()}
 
@@ -259,8 +265,11 @@ def _find_key(row: Dict[str, Any], candidates: List[str]) -> str | None:
     return None
 
 
-# Build one normalized ground-truth record with both bbox formats.
 def _build_gt_record(frame: int, track_id: str, x: float, y: float, w: float, h: float) -> Dict[str, Any]:
+    # Store both bbox formats.
+    # Example:
+    #   bbox_xywh = [100, 50, 80, 40]
+    #   bbox_xyxy = [100, 50, 100+80, 50+40] = [100, 50, 180, 90]
     return {
         "frame": int(frame),
         "track_id": str(track_id),
@@ -273,7 +282,6 @@ def _build_gt_record(frame: int, track_id: str, x: float, y: float, w: float, h:
     }
 
 
-# Compute simple dataset statistics from ground-truth boxes.
 def summarize_ground_truth(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not records:
         return {
@@ -292,9 +300,13 @@ def summarize_ground_truth(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         frame = int(item["frame"])
         track_id = str(item["track_id"])
 
+        # Count objects per frame.
+        # Example: if frame 10 has 3 boxes, frames[10] becomes 3.
         frames.setdefault(frame, 0)
         frames[frame] += 1
 
+        # Count frames per track ID.
+        # Example: track "5" appears in frames {1,2,3} -> length = 3.
         tracks.setdefault(track_id, set())
         tracks[track_id].add(frame)
 
@@ -304,6 +316,7 @@ def summarize_ground_truth(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         "total_groundtruth_boxes": len(records),
         "total_groundtruth_tracks": len(tracks),
         "annotated_frames": len(frames),
+        # Example: object counts per frame = [3, 4, 5] -> average = 4.
         "avg_objects_per_frame": round(sum(frames.values()) / len(frames), 4) if frames else 0,
         "max_objects_per_frame": max(frames.values()) if frames else 0,
         "avg_track_length_frames": round(sum(track_lengths) / len(track_lengths), 4) if track_lengths else 0

@@ -113,30 +113,54 @@ class KalmanFilter:
 
     def predict(self, mean: np.ndarray, covariance: np.ndarray):
         """
-        Predict the next track state before matching with current detections.
+        Predict the next track state before matching with detections.
 
-        The prediction uses a constant-velocity model:
+        The Kalman Filter uses a constant-velocity model:
             new_position = old_position + velocity
+
+        State vector:
+            x = [cx, cy, a, h, vx, vy, va, vh]
+
+        where:
+            cx, cy : center point of the bounding box
+            a      : aspect ratio = width / height
+            h      : bounding box height
+            vx, vy : velocity of cx and cy
+            va     : velocity of aspect ratio
+            vh     : velocity of height
 
         Formula:
             x' = F x
             P' = F P F^T + Q
 
-        where:
-            x: current state mean [cx, cy, a, h, vx, vy, va, vh]
-            x': predicted state mean
-            P: current covariance, representing current uncertainty
-            P': predicted covariance, representing uncertainty after prediction
-            F: motion matrix that applies the constant-velocity model
-            Q: motion noise covariance for unpredictable movement
+        Example:
+            If current state is:
+                cx = 100, cy = 50, h = 160
+                vx = 5,   vy = 2
 
-        This step lets the tracker estimate where an object should be before
-        the detector result of the current frame is used.
-        """         
-        # Scale process noise according to the current object height.
+            Then prediction gives:
+                cx' = 100 + 5 = 105
+                cy' = 50  + 2 = 52
+
+            So before seeing the current frame detection, the tracker predicts
+            that the object moves from (100, 50) to around (105, 52).
+        """
+
+        # Use current bounding box height to scale the prediction noise.
+        # Example:
+        #   if h = 160:
+        #       position noise = h / 20  = 8 pixels
+        #       velocity noise = h / 160 = 1 pixel/frame
+        #
+        # Larger boxes allow larger pixel-level uncertainty.
         h = max(float(mean[3]), 1.0)
 
-        # Standard deviation for position noise.
+        # Standard deviation for position-related state values: [cx, cy, a, h].
+        # Example with h = 160:
+        #   cx noise = 160 / 20 = 8
+        #   cy noise = 160 / 20 = 8
+        #   a noise  = 0.01, kept very small because aspect ratio should be stable
+        #   h noise  = 160 / 20 = 8
         std_pos = np.array(
             [
                 self.std_weight_position * h,  # cx noise
@@ -147,24 +171,56 @@ class KalmanFilter:
             dtype=np.float32,
         )
 
-        # Standard deviation for velocity noise.
+        # Standard deviation for velocity-related state values: [vx, vy, va, vh].
+        # Example with h = 160:
+        #   vx noise = 160 / 160 = 1
+        #   vy noise = 160 / 160 = 1
+        #   va noise = 0.00001, kept very small
+        #   vh noise = 160 / 160 = 1
+        #
+        # Velocity noise is smaller than position noise to keep motion smooth.
         std_vel = np.array(
             [
                 self.std_weight_velocity * h,  # vx noise
                 self.std_weight_velocity * h,  # vy noise
-                1e-5,                          # va noise
-                self.std_weight_velocity * h,  # vh noise
+                1e-5,                          # aspect ratio velocity noise
+                self.std_weight_velocity * h,  # height velocity noise
             ],
             dtype=np.float32,
         )
 
-        # Motion noise covariance Q.
+        # Build motion noise covariance Q.
+        # Covariance uses variance, so standard deviation must be squared.
+        #
+        # Example:
+        #   std = [8, 8, 0.01, 8, 1, 1, 0.00001, 1]
+        #   variance = std^2
+        #
+        # np.diag(...) puts these variance values on the diagonal of Q.
         motion_cov = np.diag(np.r_[std_pos, std_vel] ** 2).astype(np.float32)
 
-        # Predict next state using the constant-velocity model.
+        # Predict the next state using:
+        #   x' = F x
+        #
+        # Example:
+        #   cx' = cx + vx
+        #   cy' = cy + vy
+        #
+        # This estimates the next object position before using YOLO detection.
         mean = self.motion_mat @ mean
 
-        # Predict next uncertainty.
+        # Predict the next uncertainty using:
+        #   P' = F P F^T + Q
+        #
+        # F P F^T:
+        #   moves the old uncertainty through the motion model.
+        #
+        # + Q:
+        #   adds motion noise because the prediction is not perfectly reliable.
+        #
+        # Meaning:
+        #   after prediction, uncertainty usually increases because no detection
+        #   has corrected the state yet.
         covariance = self.motion_mat @ covariance @ self.motion_mat.T + motion_cov
 
         return mean.astype(np.float32), covariance.astype(np.float32)
@@ -208,56 +264,93 @@ class KalmanFilter:
 
         return projected_mean.astype(np.float32), projected_cov.astype(np.float32)
 
-    def update(
-        self,
-        mean: np.ndarray,
-        covariance: np.ndarray,
-        measurement: np.ndarray,
-    ):
+    def project(self, mean: np.ndarray, covariance: np.ndarray):
         """
-        Correct the predicted state using a matched detection.
+        Project the 8D Kalman state into the 4D detection space.
 
-        The update step compares the predicted measurement with the actual
-        detection and uses the error to refine the track state.
+        Kalman state has 8 values:
+            [cx, cy, a, h, vx, vy, va, vh]
+
+        YOLO detection only has 4 values:
+            [cx, cy, a, h]
+
+        Therefore, this function keeps only [cx, cy, a, h]
+        so the Kalman prediction can be compared with a detection.
 
         Formula:
-            K = P H^T (H P H^T + R)^(-1)
-            x_new = x + K (z - Hx)
-            P_new = P - K S K^T
+            projected_mean = H x
+            projected_cov  = H P H^T + R
 
-        where:
-            x: predicted state mean [cx, cy, a, h, vx, vy, va, vh]
-            x_new: updated state mean after using the matched detection
-            P: predicted covariance, representing prediction uncertainty
-            P_new: updated covariance after correction
-            K: Kalman gain, controlling how much to trust the detection
-            H: measurement matrix that maps the state to [cx, cy, a, h]
-            z: detection measurement [cx, cy, a, h]
-            Hx: predicted measurement in detection space
-            z - Hx: innovation, or prediction error
-            R: measurement noise covariance
-            S: innovation covariance, S = H P H^T + R
+        Simple example:
+            mean = [100, 50, 1.5, 160, 5, 2, 0, 1]
 
-        This step pulls the predicted state closer to the matched detection
-        while keeping the track movement smooth.
+            After projection:
+            projected_mean = [100, 50, 1.5, 160]
+
+            The velocity part [5, 2, 0, 1] is removed because
+            detections do not provide velocity.
         """
-        # Convert the predicted state into measurement space.
-        projected_mean, projected_cov = self.project(mean, covariance)
 
-        # Kalman gain decides how much we trust the detection
-        # compared with the prediction.
-        kalman_gain = covariance @ self.update_mat.T @ np.linalg.inv(projected_cov)
+        # Use current bbox height to scale measurement noise.
+        #
+        # Example:
+        #   if h = 160:
+        #       cx noise = 160 / 20 = 8 pixels
+        #       cy noise = 160 / 20 = 8 pixels
+        #       h noise  = 160 / 20 = 8 pixels
+        #
+        # This means larger boxes allow larger pixel-level detector error.
+        h = max(float(mean[3]), 1.0)
 
-        # Difference between actual detection and predicted detection.
-        innovation = measurement - projected_mean
+        # Standard deviation of measurement noise for [cx, cy, a, h].
+        #
+        # Example with h = 160:
+        #   std = [8, 8, 0.1, 8]
+        #
+        # cx, cy, and h noise depend on bbox height.
+        # Aspect ratio noise is fixed because it is a scale-independent value.
+        std = np.array(
+            [
+                self.std_weight_position * h,  # cx measurement noise
+                self.std_weight_position * h,  # cy measurement noise
+                1e-1,                          # aspect ratio measurement noise
+                self.std_weight_position * h,  # height measurement noise
+            ],
+            dtype=np.float32,
+        )
 
-        # Correct the predicted state using the innovation.
-        new_mean = mean + kalman_gain @ innovation
+        # Build measurement noise covariance R.
+        #
+        # Covariance stores variance, so we square each std value.
+        #
+        # Example:
+        #   std = [8, 8, 0.1, 8]
+        #   std * std = [64, 64, 0.01, 64]
+        #
+        # np.diag(...) puts these values on the diagonal of R.
+        innovation_cov = np.diag(std * std).astype(np.float32)
 
-        # Reduce uncertainty after using the new measurement.
-        new_covariance = covariance - kalman_gain @ projected_cov @ kalman_gain.T
+        # Project state mean using:
+        #   projected_mean = H x
+        #
+        # Example:
+        #   [100, 50, 1.5, 160, 5, 2, 0, 1]
+        #        -> [100, 50, 1.5, 160]
+        #
+        # This removes velocity because detection has no velocity values.
+        projected_mean = self.update_mat @ mean
 
-        return new_mean.astype(np.float32), new_covariance.astype(np.float32)
+        # Project covariance into detection space using:
+        #   projected_cov = H P H^T
+        #   keep only the uncertainty related to [cx, cy, a, h].
+        projected_cov = self.update_mat @ covariance @ self.update_mat.T
+
+        # Add measurement noise R:
+        #   projected_cov = H P H^T + R
+        #   YOLO detection is not perfectly accurate, so we add detector noise.
+        projected_cov = projected_cov + innovation_cov
+
+        return projected_mean.astype(np.float32), projected_cov.astype(np.float32)
 
     def gating_distance(
         self,
@@ -268,28 +361,35 @@ class KalmanFilter:
         """
         Compute Mahalanobis distances between one predicted track and detections.
 
-        This is used as a motion consistency cost during matching.
+        Example:
+            predicted = [100, 50, 1.5, 160]
+            det_0     = [102, 51, 1.5, 158] -> small distance
+            det_1     = [300, 80, 1.2, 140] -> large distance
 
-        A small distance means:
-            the detection is consistent with the predicted track motion.
-
-        A large distance means:
-            the detection is far from where the Kalman Filter expected the object.
+        Smaller distance means the detection is more consistent with the prediction.
         """
-        # Project the predicted state into measurement space.
+        # Convert 8D state to 4D measurement space: [cx, cy, a, h].
         projected_mean, projected_cov = self.project(mean, covariance)
 
-        # Difference between each detection and the predicted measurement.
+        # Error between each detection and the predicted measurement.
+        # Example: [102, 51, 1.5, 158] - [100, 50, 1.5, 160] = [2, 1, 0, -2].
         d = measurements - projected_mean
 
-        # Inverse covariance is used to normalize the distance by uncertainty.
+        # Compute motion cost between the Kalman prediction and each detection.
+        # Simple idea:
+        #   distance = prediction_error^2 / prediction_uncertainty
+        # Example:
+        #   predicted = [100, 50]
+        #   detection = [105, 52]
+        #   error d   = [5, 2]
+        #
+        # If this error is small compared with Kalman uncertainty,
+        # the distance is small -> likely match.
+        #
+        # If this error is large compared with Kalman uncertainty,
+        # the distance is large -> unlikely match.
         inv_cov = np.linalg.inv(projected_cov)
 
-        # Mahalanobis distance:
-        #   d^2 = (z - mean)^T S^(-1) (z - mean)
-        #
-        # z - mean is the prediction error.
-        # S^(-1) scales this error based on prediction uncertainty.
-        # Lower distance means the detection is more consistent with the prediction.
+        # Vectorized Mahalanobis distance for all detections.
+        # It returns one motion distance for each detection.
         return np.sum(d @ inv_cov * d, axis=1)
-

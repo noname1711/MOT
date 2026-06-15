@@ -9,7 +9,6 @@ from src.pipeline import VehicleTrackingPipeline
 from src.utils import convert_video_to_h264, ensure_dir, write_tracking_header, write_tracking_rows
 
 
-# File-based processor for dataset, upload, and comparison runs.
 class VideoProcessor:
     """
     Process video files for upload, dataset, and comparison modes.
@@ -28,7 +27,6 @@ class VideoProcessor:
     ):
         self.tracker_type = tracker_type
 
-        # Reuse the same frame pipeline for every video frame.
         self.pipeline = VehicleTrackingPipeline(
             yolo_model_path=yolo_model_path,
             conf_threshold=conf_threshold,
@@ -40,7 +38,6 @@ class VideoProcessor:
             max_cosine_distance=max_cosine_distance,
         )
 
-    # Process a whole video, save visualization, and export tracking rows.
     def process(
         self,
         input_video_path: str,
@@ -51,15 +48,14 @@ class VideoProcessor:
         if not os.path.exists(input_video_path):
             raise FileNotFoundError(f"Video not found: {input_video_path}")
 
-        # Open the input video for sequential frame reading.
         cap = cv2.VideoCapture(input_video_path)
 
         if not cap.isOpened():
             raise RuntimeError(f"Cannot open video: {input_video_path}")
 
-        # Read video metadata used for writer setup and metrics.
         original_fps = cap.get(cv2.CAP_PROP_FPS)
         if original_fps <= 0:
+            # Fallback example: if OpenCV cannot read FPS, use 25 FPS.
             original_fps = 25.0
 
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -73,7 +69,6 @@ class VideoProcessor:
         temp_output_video_path = f"{base_name}_temp{ext}"
 
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        # Write a temporary MP4 first, then convert it to H.264.
         writer = cv2.VideoWriter(
             temp_output_video_path,
             fourcc,
@@ -95,7 +90,6 @@ class VideoProcessor:
                 csv_writer = csv.writer(f)
                 write_tracking_header(csv_writer)
 
-                # Main frame loop.
                 while True:
                     ret, frame = cap.read()
 
@@ -104,7 +98,6 @@ class VideoProcessor:
 
                     frame_id += 1
 
-                    # Run detection, tracking, and drawing for this frame.
                     result = self.pipeline.process_frame(frame, draw=True)
 
                     detector_total_time += result["detector_time"]
@@ -113,7 +106,6 @@ class VideoProcessor:
                     output_frame = result["frame"]
                     tracks = result["tracks"]
 
-                    # Save track results in TXT format for later metrics.
                     write_tracking_rows(csv_writer, frame_id, tracks)
 
                     writer.write(output_frame)
@@ -131,7 +123,8 @@ class VideoProcessor:
             cap.release()
             writer.release()
 
-        # Compute processing speed after all frames are processed.
+        # Example:
+        #   processed frames=300, elapsed=60 sec -> process_fps=5 FPS.
         elapsed_time = time.time() - start_time
         process_fps = frame_id / elapsed_time if elapsed_time > 0 else 0
 
@@ -155,6 +148,8 @@ class VideoProcessor:
             "original_fps": original_fps,
             "width": width,
             "height": height,
+            # Average runtime per frame.
+            # Example: detector_total_time=9 sec, frames=300 -> 0.03 sec/frame.
             "avg_detector_time": detector_total_time / frame_id if frame_id else 0,
             "avg_tracker_time": tracker_total_time / frame_id if frame_id else 0
         }

@@ -4,8 +4,15 @@ from typing import Any, Dict, List, Tuple
 from src.utils import get_vehicle_class_name, read_tracking_txt
 
 
-# Compute IoU between two [x1, y1, x2, y2] boxes.
 def compute_iou(box_a: List[float], box_b: List[float]) -> float:
+    """
+    Example:
+        box_a = [0, 0, 4, 4] -> area = 16
+        box_b = [2, 2, 6, 6] -> area = 16
+        intersection = [2, 2, 4, 4] -> area = 4
+        union = 16 + 16 - 4 = 28
+        IoU = 4 / 28 = 0.1429
+    """
     ax1, ay1, ax2, ay2 = box_a
     bx1, by1, bx2, by2 = box_b
 
@@ -29,14 +36,12 @@ def compute_iou(box_a: List[float], box_b: List[float]) -> float:
     return inter_area / union
 
 
-# Analyze exported tracking rows without requiring ground truth.
 def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str, Any]:
     records = read_tracking_txt(tracking_txt_path)
 
     if fps <= 0:
         fps = 25.0
 
-    # Group all TXT rows by predicted track ID.
     tracks = defaultdict(list)
 
     for item in records:
@@ -52,13 +57,11 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
         frames = [int(x["frame"]) for x in items]
         confs = [float(x["confidence"]) for x in items]
 
-        # Visible rows are backed by an actual detection.
         visible_items = [
             x for x in items
             if int(x["visibility"]) == 1 and int(x["class_id"]) != -1
         ]
 
-        # Predicted rows are produced by tracker prediction only.
         predicted_items = [
             x for x in items
             if int(x["visibility"]) == 0 or int(x["class_id"]) == -1
@@ -73,9 +76,16 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
         last_frame = max(frames)
         frames_tracked = len(items)
 
+        # tracked duration counts only rows where the track appears.
+        # Example: frames_tracked=50, fps=25 -> duration=2 seconds.
         duration_seconds = frames_tracked / fps
+
+        # lifespan counts from first frame to last frame, including gaps.
+        # Example: first=10, last=60, fps=25 -> (60-10+1)/25=2.04 seconds.
         lifespan_seconds = (last_frame - first_frame + 1) / fps
 
+        # Average confidence over this track.
+        # Example: [0.8, 0.6, 1.0] -> avg_conf=0.8.
         avg_conf = sum(confs) / len(confs) if confs else 0
 
         track_summaries.append({
@@ -106,7 +116,8 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
 
     track_lengths = [item["frames_tracked"] for item in track_summaries]
 
-    # Short tracks are useful for spotting unstable or noisy IDs.
+    # Short-track threshold is half a second, but at least 3 frames.
+    # Example: fps=10 -> max(3, 10*0.5)=5 frames.
     short_tracks = [
         length for length in track_lengths
         if length <= max(3, int(fps * 0.5))
@@ -138,7 +149,6 @@ def analyze_tracking_txt(tracking_txt_path: str, fps: float = 25.0) -> Dict[str,
     }
 
 
-# Build metrics for videos without ground-truth annotations.
 def build_upload_metrics(
     tracking_txt_path: str,
     process_info: Dict[str, Any],
@@ -191,7 +201,6 @@ def build_upload_metrics(
     }
 
 
-# Evaluate predictions against ground truth using greedy IoU matching.
 def evaluate_with_ground_truth(
     ground_truth_records: List[Dict[str, Any]],
     prediction_records: List[Dict[str, Any]],
@@ -218,7 +227,6 @@ def evaluate_with_ground_truth(
         Higher MOTP proxy means better bounding-box localization quality.
     """
 
-    # Group ground-truth and prediction boxes by frame for matching.
     gt_by_frame = defaultdict(list)
     pred_by_frame = defaultdict(list)
 
@@ -243,7 +251,8 @@ def evaluate_with_ground_truth(
         total_gt += len(gt_items)
         total_pred += len(pred_items)
 
-        # Candidate matches must pass the IoU threshold.
+        # Candidate pairs must pass IoU threshold.
+        # Example: threshold=0.5, IoU=0.72 -> candidate; IoU=0.30 -> ignored.
         candidate_pairs = []
 
         for gi, gt in enumerate(gt_items):
@@ -253,7 +262,8 @@ def evaluate_with_ground_truth(
                 if iou >= iou_threshold:
                     candidate_pairs.append((iou, gi, pi))
 
-        # Greedily match highest-IoU pairs first.
+        # Match highest-IoU pairs first.
+        # Example: candidates [(0.9, gt0, pred1), (0.6, gt0, pred0)] -> choose 0.9 first.
         candidate_pairs.sort(reverse=True, key=lambda x: x[0])
 
         used_gt = set()
@@ -278,10 +288,14 @@ def evaluate_with_ground_truth(
 
     true_positive = len(matches)
 
-    # Standard detection-style precision, recall, and F1 scores.
+    # Example:
+    #   TP=80, total_pred=100 -> precision=0.8
+    #   TP=80, total_gt=120   -> recall=0.6667
     precision = true_positive / total_pred if total_pred else 0
     recall = true_positive / total_gt if total_gt else 0
 
+    # Example:
+    #   precision=0.8, recall=0.6667 -> F1≈0.7273
     f1 = (
         2 * precision * recall / (precision + recall)
         if precision + recall > 0
@@ -291,15 +305,20 @@ def evaluate_with_ground_truth(
     # MOTP proxy:
     # In this project, localization quality is measured by IoU.
     # Therefore, MOTP proxy is the average IoU over all matched boxes.
+    # Example:
+    #   matched IoUs = [0.8, 0.6, 0.7]
+    #   MOTP proxy = (0.8 + 0.6 + 0.7) / 3 = 0.7
     motp_proxy = (
         sum(match_iou for _, _, _, match_iou in matches) / len(matches)
         if matches
         else 0
     )
 
-    # Count predicted ID changes for the same ground-truth object.
     id_switches = _count_id_switches(matches)
 
+    # Example:
+    #   GT=100, FN=10, FP=5, IDSW=2
+    #   MOTA proxy = 1 - (10+5+2)/100 = 0.83
     mota_proxy = (
         1 - ((false_negative + false_positive + id_switches) / total_gt)
         if total_gt
@@ -323,7 +342,6 @@ def evaluate_with_ground_truth(
     }
 
 
-# Build full dataset metrics when ground truth is available.
 def build_dataset_metrics(
     dataset_name: str,
     ground_truth_records: List[Dict[str, Any]],
@@ -378,7 +396,6 @@ def build_dataset_metrics(
     }
 
 
-# Pick the most frequent non-predicted class for one track.
 def _get_main_class_id(records: List[Dict[str, Any]]) -> int:
     counts = defaultdict(int)
 
@@ -396,7 +413,6 @@ def _get_main_class_id(records: List[Dict[str, Any]]) -> int:
     return max(counts, key=counts.get)
 
 
-# Count ID switches from matched ground-truth/predicted ID pairs.
 def _count_id_switches(matches: List[Tuple[int, str, str, float]]) -> int:
     by_gt_id = defaultdict(list)
 
@@ -410,6 +426,9 @@ def _count_id_switches(matches: List[Tuple[int, str, str, float]]) -> int:
         last_pred_id = None
 
         for _, pred_id in pairs:
+            # Example for one GT object:
+            #   predicted IDs over time: [7, 7, 12]
+            #   change 7 -> 12 counts as one ID switch.
             if last_pred_id is not None and pred_id != last_pred_id:
                 id_switches += 1
 

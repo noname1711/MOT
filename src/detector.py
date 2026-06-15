@@ -6,7 +6,6 @@ from ultralytics import YOLO
 from src.utils import VEHICLE_CLASS_IDS, VEHICLE_CLASS_NAMES
 
 
-# Lightweight wrapper that exposes YOLO detections in project format.
 class YOLODetector:
     """
     YOLOv5/Ultralytics wrapper for vehicle detection.
@@ -30,20 +29,21 @@ class YOLODetector:
         self.conf_threshold = conf_threshold
         self.image_size = image_size
         self.device = device
-        # Restrict detection to vehicle classes unless overridden.
         self.target_classes = target_classes or VEHICLE_CLASS_IDS
 
-        # Load the YOLO model once during detector initialization.
         self.model = YOLO(self.model_path)
 
-    # Run YOLO on one frame and return normalized detection dictionaries.
     def detect(self, frame) -> List[Dict[str, Any]]:
         if frame is None:
             return []
 
+        # OpenCV frame shape is [height, width, channels].
+        # Example: frame.shape = (720, 1280, 3) -> height=720, width=1280.
         frame_height, frame_width = frame.shape[:2]
 
-        # Perform model inference with confidence, class, and device settings.
+        # Run YOLO inference on this frame.
+        # Example:
+        #   conf_threshold = 0.35 means boxes below 0.35 confidence are filtered.
         results = self.model.predict(
             source=frame,
             imgsz=self.image_size,
@@ -58,7 +58,6 @@ class YOLODetector:
         if not results:
             return detections
 
-        # Ultralytics stores predicted bounding boxes in results[0].boxes.
         boxes = results[0].boxes
 
         if boxes is None:
@@ -69,25 +68,30 @@ class YOLODetector:
             conf = float(box.conf[0].cpu().numpy())
             class_id = int(box.cls[0].cpu().numpy())
 
-            # Extra safety check in case the backend returns other classes.
             if class_id not in self.target_classes:
                 continue
 
             x1, y1, x2, y2 = xyxy
 
-            # Clamp box coordinates to the valid image region.
+            # Clamp coordinates to the image boundary.
+            # Example: x1=-5 -> 0, x2=1300 with width=1280 -> 1279.
             x1 = int(max(0, min(frame_width - 1, x1)))
             y1 = int(max(0, min(frame_height - 1, y1)))
             x2 = int(max(0, min(frame_width - 1, x2)))
             y2 = int(max(0, min(frame_height - 1, y2)))
 
+            # Convert [x1, y1, x2, y2] to width and height.
+            # Example: x1=100, x2=180 -> w=80; y1=50, y2=90 -> h=40.
             w = x2 - x1
             h = y2 - y1
 
-            # Ignore invalid boxes after clamping.
             if w <= 0 or h <= 0:
                 continue
 
+            # Store both bbox formats for later modules.
+            # Example:
+            #   bbox_xyxy = [100, 50, 180, 90]
+            #   bbox_xywh = [100, 50, 80, 40]
             detections.append({
                 "bbox_xyxy": [x1, y1, x2, y2],
                 "bbox_xywh": [x1, y1, w, h],
@@ -98,7 +102,6 @@ class YOLODetector:
 
         return detections
 
-    # Draw raw detector outputs for debugging or detector-only visualization.
     def draw_detections(self, frame, detections: List[Dict[str, Any]]):
         output_frame = frame.copy()
 

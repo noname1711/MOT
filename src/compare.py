@@ -8,14 +8,12 @@ from src.utils import ensure_dir, save_json, timestamp_now
 from src.video_processor import VideoProcessor
 
 
-# Trackers used in side-by-side comparison runs.
 TRACKERS_TO_COMPARE = [
     ("deepsort", "DeepSORT (original)"),
     ("custom", "Custom DeepSORT"),
 ]
 
 
-# Compare both trackers on a dataset that has ground-truth annotations.
 def compare_dataset_trackers(
     dataset_name: str,
     yolo_model_path: str = "models/yolov5n.pt",
@@ -24,7 +22,6 @@ def compare_dataset_trackers(
     device: str = "cpu",
     max_frames: Optional[int] = None,
 ) -> Dict[str, Any]:
-    # Load dataset paths and metadata first.
     dataset_info = get_dataset_info(dataset_name)
     input_video_path = dataset_info.get("original_video_path")
 
@@ -33,10 +30,10 @@ def compare_dataset_trackers(
             f"Dataset {dataset_name} does not contain Original-video.mp4"
         )
 
-    # Ground truth is required for dataset-level evaluation metrics.
     ground_truth_records = load_ground_truth_records(dataset_info)
 
-    # Keep ground-truth boxes only inside the evaluated frame range.
+    # Example:
+    #   max_frames = 100 -> evaluate only ground truth boxes with frame <= 100.
     if max_frames is not None:
         ground_truth_records = [
             item for item in ground_truth_records
@@ -60,7 +57,6 @@ def compare_dataset_trackers(
     )
 
 
-# Compare both trackers on an uploaded video without ground truth.
 def compare_upload_trackers(
     input_video_path: str,
     run_name: str,
@@ -82,7 +78,6 @@ def compare_upload_trackers(
     )
 
 
-# Shared comparison routine used by both dataset and upload modes.
 def compare_trackers_for_video(
     input_video_path: str,
     run_name: str,
@@ -96,7 +91,10 @@ def compare_trackers_for_video(
     groundtruth_summary: Optional[Dict[str, Any]] = None,
     dataset_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    # Build a stable run ID for all output files.
+    # Example:
+    #   run_name = "VNTraffic"
+    #   timestamp_now() = "20260615_093000"
+    #   run_id = "20260615_093000_VNTraffic"
     safe_name = _safe_name(run_name)
     run_id = f"{timestamp_now()}_{safe_name}"
 
@@ -110,7 +108,6 @@ def compare_trackers_for_video(
 
     tracker_results = {}
 
-    # Run each tracker independently on the same input video.
     for tracker_key, tracker_label in TRACKERS_TO_COMPARE:
         output_video_name = f"{run_id}_{tracker_key}_tracking.mp4"
         output_txt_name = f"{run_id}_{tracker_key}_tracking.txt"
@@ -121,7 +118,6 @@ def compare_trackers_for_video(
         result_txt_path = os.path.join(txt_result_dir, output_txt_name)
         result_metrics_path = os.path.join(metrics_result_dir, output_metrics_name)
 
-        # Create a fresh processor so each tracker has its own state.
         processor = VideoProcessor(
             yolo_model_path=yolo_model_path,
             conf_threshold=conf_threshold,
@@ -139,7 +135,6 @@ def compare_trackers_for_video(
 
         shutil.copyfile(static_output_video_path, result_video_path)
 
-        # Dataset mode can compute detection/tracking evaluation metrics.
         if ground_truth_records is not None:
             metrics_data = build_dataset_metrics(
                 dataset_name=dataset_name or run_name,
@@ -154,7 +149,6 @@ def compare_trackers_for_video(
                 process_info=process_info,
             )
 
-        # Attach run metadata to the metrics JSON.
         metrics_data.update({
             "run_id": run_id,
             "compare_mode": True,
@@ -185,7 +179,6 @@ def compare_trackers_for_video(
             "metrics": metrics_data,
         }
 
-    # Build a compact table-like summary for the web UI.
     summary = _build_comparison_summary(
         run_id=run_id,
         mode=mode,
@@ -206,7 +199,6 @@ def compare_trackers_for_video(
     return summary
 
 
-# Convert detailed tracker outputs into comparable summary rows.
 def _build_comparison_summary(
     run_id: str,
     mode: str,
@@ -233,6 +225,8 @@ def _build_comparison_summary(
                 float(process_info.get("process_fps", 0)),
                 4,
             ),
+            # Convert seconds to milliseconds.
+            # Example: 0.012 sec * 1000 = 12 ms.
             "avg_tracker_time_ms": round(
                 float(process_info.get("avg_tracker_time", 0)) * 1000,
                 4,
@@ -278,8 +272,9 @@ def _build_comparison_summary(
     }
 
 
-# Make a filesystem-safe name for output file prefixes.
 def _safe_name(name: str) -> str:
+    # Replace unsafe filename characters with underscores.
+    # Example: "my video#1" -> "my_video_1".
     cleaned = "".join(
         c if c.isalnum() or c in {"-", "_"} else "_"
         for c in str(name)

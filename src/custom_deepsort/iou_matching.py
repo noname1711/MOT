@@ -5,37 +5,42 @@ import numpy as np
 
 def iou(box_a: List[float], box_b: List[float]) -> float:
     """
-    Compute Intersection over Union between two bounding boxes.
+    Compute IoU between two boxes in [x1, y1, x2, y2] format.
 
-    Each box is expected in [x1, y1, x2, y2] format.
+    Example:
+        box_a = [0, 0, 4, 4], box_b = [2, 2, 6, 6]
+        intersection area = 4
+        union area = 16 + 16 - 4 = 28
+        IoU = 4 / 28 = 0.14
     """
     ax1, ay1, ax2, ay2 = box_a
     bx1, by1, bx2, by2 = box_b
 
-    # Compute the coordinates of the intersection rectangle.
+    # Overlapping rectangle coordinates.
+    # Example overlap: [2, 2, 4, 4].
     inter_x1 = max(ax1, bx1)
     inter_y1 = max(ay1, by1)
     inter_x2 = min(ax2, bx2)
     inter_y2 = min(ay2, by2)
 
-    # Compute intersection width and height.
-    # If boxes do not overlap, width or height becomes 0.
+    # Overlap width and height; 0 if boxes do not overlap.
     inter_w = max(0.0, inter_x2 - inter_x1)
     inter_h = max(0.0, inter_y2 - inter_y1)
 
     inter_area = inter_w * inter_h
 
-    # Compute the area of each bounding box.
+    # Individual box areas.
     area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
     area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
 
-    # Union = area A + area B - intersection area.
+    # Union counts both boxes but subtracts the overlap once.
     union = area_a + area_b - inter_area
 
-    # Avoid division by zero for invalid boxes.
     if union <= 0:
         return 0.0
 
+    # IoU = overlap area / union area.
+    # Higher IoU means two boxes overlap more.
     return inter_area / union
 
 

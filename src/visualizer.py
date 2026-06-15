@@ -3,13 +3,15 @@ from typing import Any, Dict, List
 import cv2
 
 
-# Generate a deterministic color from a track ID.
 def get_track_color(track_id: str):
     try:
         value = int(track_id)
     except ValueError:
         value = sum(ord(c) for c in str(track_id))
 
+    # Deterministic color from ID.
+    # Example for ID=5:
+    #   b=(29*5)%255=145, g=(17*5)%255=85, r=(37*5)%255=185.
     b = (29 * value) % 255
     g = (17 * value) % 255
     r = (37 * value) % 255
@@ -17,7 +19,6 @@ def get_track_color(track_id: str):
     return int(b), int(g), int(r)
 
 
-# Draw bounding boxes, IDs, and labels for tracked objects.
 def draw_tracks(frame, tracks: List[Dict[str, Any]]):
     output_frame = frame.copy()
 
@@ -30,7 +31,6 @@ def draw_tracks(frame, tracks: List[Dict[str, Any]]):
 
         color = get_track_color(track_id)
 
-        # Show class and confidence only when a real detection is matched.
         if visibility == 1:
             label = f"ID {track_id} | {class_name} {confidence:.2f}"
         else:
@@ -38,6 +38,8 @@ def draw_tracks(frame, tracks: List[Dict[str, Any]]):
 
         cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, 2)
 
+        # Keep label text inside the frame.
+        # Example: y1=10 -> y1-8=2, so text_y becomes 20.
         text_y = max(20, y1 - 8)
 
         cv2.rectangle(
@@ -61,7 +63,6 @@ def draw_tracks(frame, tracks: List[Dict[str, Any]]):
     return output_frame
 
 
-# Draw simple key-value status text on top of a frame.
 def draw_hud(frame, items: Dict[str, Any]):
     output_frame = frame.copy()
 
